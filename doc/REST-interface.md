@@ -6,12 +6,6 @@ The REST API can be enabled with the `-rest` option.
 The interface runs on the same port as the JSON-RPC interface, by default port 9332 for mainnet, port 19332 for testnet,
 and port 19443 for regtest.
 
-REST Interface consistency guarantees
--------------------------------------
-
-The [same guarantees as for the RPC Interface](/doc/JSON-RPC-interface.md#rpc-consistency-guarantees)
-apply.
-
 Supported API
 -------------
 
@@ -20,15 +14,13 @@ Supported API
 
 Given a transaction hash: returns a transaction in binary, hex-encoded binary, or JSON formats.
 
-By default, this endpoint will only search the mempool.
-To query for a confirmed transaction, enable the transaction index via "txindex=1" command line / configuration option.
+For full TX query capability, one must enable the transaction index via "txindex=1" command line / configuration option.
 
 #### Blocks
 `GET /rest/block/<BLOCK-HASH>.<bin|hex|json>`
 `GET /rest/block/notxdetails/<BLOCK-HASH>.<bin|hex|json>`
 
 Given a block hash: returns a block, in binary, hex-encoded binary or JSON formats.
-Responds with 404 if the block doesn't exist.
 
 The HTTP request and response are both handled entirely in-memory, thus making maximum memory usage at least 2.66MB (1 MB max block, plus hex encoding) per request.
 
@@ -38,12 +30,6 @@ With the /notxdetails/ option JSON response will only contain the transaction ha
 `GET /rest/headers/<COUNT>/<BLOCK-HASH>.<bin|hex|json>`
 
 Given a block hash: returns <COUNT> amount of blockheaders in upward direction.
-Returns empty if the block doesn't exist or it isn't in the active chain.
-
-#### Blockhash by height
-`GET /rest/blockhashbyheight/<HEIGHT>.<bin|hex|json>`
-
-Given a height: returns hash of block in best-block-chain at height provided.
 
 #### Chaininfos
 `GET /rest/chaininfo.json`
@@ -105,7 +91,7 @@ Only supports JSON as output format.
 * bytes : (numeric) size of the TX mempool in bytes
 * usage : (numeric) total TX mempool memory usage
 * maxmempool : (numeric) maximum memory usage for the mempool in bytes
-* mempoolminfee : (numeric) minimum feerate (LTC per KB) for tx to be accepted
+* mempoolminfee : (numeric) minimum feerate (XLT per KB) for tx to be accepted
 
 `GET /rest/mempool/contents.json`
 
@@ -114,4 +100,4 @@ Only supports JSON as output format.
 
 Risks
 -------------
-Running a web browser on the same node with a REST enabled litecoind can be a risk. Accessing prepared XSS websites could read out tx/block data of your node by placing links like `<script src="http://127.0.0.1:9332/rest/tx/1234567890.json">` which might break the nodes privacy.
+Running a web browser on the same node with a REST enabled nexaltd can be a risk. Accessing prepared XSS websites could read out tx/block data of your node by placing links like `<script src="http://127.0.0.1:9332/rest/tx/1234567890.json">` which might break the nodes privacy.

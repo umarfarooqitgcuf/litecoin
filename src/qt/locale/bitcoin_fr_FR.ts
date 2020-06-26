@@ -3,7 +3,7 @@
     <name>AddressBookPage</name>
     <message>
         <source>Right-click to edit address or label</source>
-        <translation>Clic-droit pour modifier l'adresse ou l'étiquette</translation>
+        <translation>Faîtes un clique droit afin de modifier l'adresse ou l'étiquette</translation>
     </message>
     <message>
         <source>Create a new address</source>
@@ -47,11 +47,11 @@
     </message>
     <message>
         <source>Choose the address to send coins to</source>
-        <translation>Choisissez une adresse où envoyer les litecoins</translation>
+        <translation>Choisissez une adresse où envoyer les nexalts</translation>
     </message>
     <message>
         <source>Choose the address to receive coins with</source>
-        <translation>Choisissez une adresse où recevoir les litecoins</translation>
+        <translation>Choisissez une adresse où recevoir les nexalts</translation>
     </message>
     <message>
         <source>C&amp;hoose</source>
@@ -66,12 +66,12 @@
         <translation>Adresses de réception</translation>
     </message>
     <message>
-        <source>These are your Litecoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
-        <translation>Ceci sont vos addresses Litecoin pour envoyer vos paiements. Il faut toujours verifier les montants et l'addresse de reception avant de valider la transaction.</translation>
+        <source>These are your Nexalt addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
+        <translation>Ceci sont vos addresses Nexalt pour envoyer vos paiements. Il faut toujours verifier les montants et l'addresse de reception avant de valider la transaction.</translation>
     </message>
     <message>
-        <source>These are your Litecoin addresses for receiving payments. It is recommended to use a new receiving address for each transaction.</source>
-        <translation>Ceci sont vos addresses Litecoin pour recevoir vos paiements. Il est recommandé d'utiliser une nouvelle adresse de recepetion pour chaque transaction</translation>
+        <source>These are your Nexalt addresses for receiving payments. It is recommended to use a new receiving address for each transaction.</source>
+        <translation>Ceci sont vos addresses Nexalt pour recevoir vos paiements. Il est recommandé d'utiliser une nouvelle adresse de recepetion pour chaque transaction</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -176,8 +176,8 @@
         <translation>Confirmer le chiffrement du porte-monnaie</translation>
     </message>
     <message>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR LITECOINS&lt;/b&gt;!</source>
-        <translation>Attention : Si vous chiffrez votre portefeuille et que vous perdez votre mot de passe vous &lt;b&gt; PERDREZ TOUS VOS LITECOINS&lt;/b&gt; !</translation>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR NEXALTS&lt;/b&gt;!</source>
+        <translation>Attention : Si vous chiffrez votre portefeuille et que vous perdez votre mot de passe vous &lt;b&gt; PERDREZ TOUS VOS NEXALTS&lt;/b&gt; !</translation>
     </message>
     <message>
         <source>Are you sure you wish to encrypt your wallet?</source>
@@ -188,8 +188,8 @@
         <translation>Portefeuille chiffré</translation>
     </message>
     <message>
-        <source>Your wallet is now encrypted. Remember that encrypting your wallet cannot fully protect your litecoins from being stolen by malware infecting your computer.</source>
-        <translation>Le porte-monnaie a été chiffré. N'oubliez pas que le chiffrement de votre porte-monnaie ne peut pas entièrement protéger vos litecoins contre le vol par un logiciel malveillant qui infecterait votre ordinateur.</translation>
+        <source>%1 will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your nexalts from being stolen by malware infecting your computer.</source>
+        <translation>%1 va à présent se fermer pour terminer la procédure de cryptage. N'oubliez pas que le chiffrement de votre porte-monnaie ne peut pas fournir une protection totale contre le vol par des logiciels malveillants qui infecteraient votre ordinateur.</translation>
     </message>
     <message>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
@@ -254,6 +254,10 @@
         <translation>&amp;Vue d'ensemble</translation>
     </message>
     <message>
+        <source>Node</source>
+        <translation>Nœud</translation>
+    </message>
+    <message>
         <source>Show general overview of wallet</source>
         <translation>Affiche une vue d'ensemble du porte-monnaie</translation>
     </message>
@@ -310,12 +314,16 @@
         <translation>&amp;Modifier le mot de passe</translation>
     </message>
     <message>
-        <source>Open &amp;URI...</source>
-        <translation>Ouvrir &amp;URI</translation>
+        <source>&amp;Sending addresses...</source>
+        <translation>&amp;Adresses d'envoi</translation>
     </message>
     <message>
-        <source>Wallet:</source>
-        <translation>Portefeuille :</translation>
+        <source>&amp;Receiving addresses...</source>
+        <translation>&amp;Adresses de réception</translation>
+    </message>
+    <message>
+        <source>Open &amp;URI...</source>
+        <translation>Ouvrir &amp;URI</translation>
     </message>
     <message>
         <source>Click to disable network activity.</source>
@@ -338,12 +346,8 @@
         <translation>Réindexer les blocs sur le disque...</translation>
     </message>
     <message>
-        <source>Proxy is &lt;b&gt;enabled&lt;/b&gt;: %1</source>
-        <translation>Le proxy est &lt;b&gt;activé&lt;/b&gt; : %1</translation>
-    </message>
-    <message>
-        <source>Send coins to a Litecoin address</source>
-        <translation>Envoyer des pièces à une adresse Litecoin</translation>
+        <source>Send coins to a Nexalt address</source>
+        <translation>Envoyer des pièces à une adresse Nexalt</translation>
     </message>
     <message>
         <source>Backup wallet to another location</source>
@@ -366,8 +370,12 @@
         <translation>&amp;Vérification du message</translation>
     </message>
     <message>
-        <source>Litecoin</source>
-        <translation>Litecoin</translation>
+        <source>Nexalt</source>
+        <translation>Nexalt</translation>
+    </message>
+    <message>
+        <source>Wallet</source>
+        <translation>Portefeuille</translation>
     </message>
     <message>
         <source>&amp;Send</source>
@@ -390,12 +398,12 @@
         <translation>Crypter les clé privées qui appartiennent votre portefeuille</translation>
     </message>
     <message>
-        <source>Sign messages with your Litecoin addresses to prove you own them</source>
-        <translation>Signer vos messages avec vos adresses Litecoin pour prouver que vous les détenez</translation>
+        <source>Sign messages with your Nexalt addresses to prove you own them</source>
+        <translation>Signer vos messages avec vos adresses Nexalt pour prouver que vous les détenez</translation>
     </message>
     <message>
-        <source>Verify messages to ensure they were signed with specified Litecoin addresses</source>
-        <translation>Vérifier les messages pour s'assurer qu'ils soient signés avec les adresses Litecoin spécifiées</translation>
+        <source>Verify messages to ensure they were signed with specified Nexalt addresses</source>
+        <translation>Vérifier les messages pour s'assurer qu'ils soient signés avec les adresses Nexalt spécifiées</translation>
     </message>
     <message>
         <source>&amp;File</source>
@@ -414,8 +422,8 @@
         <translation>Barre d'outils des onglets</translation>
     </message>
     <message>
-        <source>Request payments (generates QR codes and litecoin: URIs)</source>
-        <translation>Demander des paiements (générer QR codes et litecoin: URIs)</translation>
+        <source>Request payments (generates QR codes and nexalt: URIs)</source>
+        <translation>Demander des paiements (générer QR codes et nexalt: URIs)</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -426,16 +434,16 @@
         <translation>Afficher la liste des labels et adresses de réception utilisées</translation>
     </message>
     <message>
-        <source>Open a litecoin: URI or payment request</source>
-        <translation>Ouvrir un litecoin: URI ou demande de paiement</translation>
+        <source>Open a nexalt: URI or payment request</source>
+        <translation>Ouvrir un nexalt: URI ou demande de paiement</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
         <translation>&amp;Options de ligne de commande</translation>
     </message>
     <message numerus="yes">
-        <source>%n active connection(s) to Litecoin network</source>
-        <translation><numerusform>%n connexion active avec le réseau Litecoin</numerusform><numerusform>%n connexions actives avec le réseau Litecoin</numerusform></translation>
+        <source>%n active connection(s) to Nexalt network</source>
+        <translation><numerusform>%n connexion active avec le réseau Nexalt</numerusform><numerusform>%n connexions actives avec le réseau Nexalt</numerusform></translation>
     </message>
     <message>
         <source>Indexing blocks on disk...</source>
@@ -474,48 +482,8 @@
         <translation>À jour</translation>
     </message>
     <message>
-        <source>&amp;Sending addresses</source>
-        <translation>&amp;Adresses d'envoi</translation>
-    </message>
-    <message>
-        <source>&amp;Receiving addresses</source>
-        <translation>&amp;Adresses de réception</translation>
-    </message>
-    <message>
-        <source>Open Wallet</source>
-        <translation>Portefeuille ouvert</translation>
-    </message>
-    <message>
-        <source>Open a wallet</source>
-        <translation>Ouvrir un portefeuille</translation>
-    </message>
-    <message>
-        <source>Close Wallet...</source>
-        <translation>Fermer portefeuille...</translation>
-    </message>
-    <message>
-        <source>Close wallet</source>
-        <translation>Fermer portefeuille</translation>
-    </message>
-    <message>
-        <source>Show the %1 help message to get a list with possible Litecoin command-line options</source>
-        <translation>Afficher le %1 message d'aide pour récupérer une liste des options de ligne de commande Litecoin</translation>
-    </message>
-    <message>
-        <source>default wallet</source>
-        <translation>portefeuille par défaut</translation>
-    </message>
-    <message>
-        <source>Opening Wallet &lt;b&gt;%1&lt;/b&gt;...</source>
-        <translation>Ouverture portefeuille &lt;b&gt;%1&lt;/b&gt;...</translation>
-    </message>
-    <message>
-        <source>Open Wallet Failed</source>
-        <translation>Le déverrouillage du porte-monnaie a échoué</translation>
-    </message>
-    <message>
-        <source>&amp;Window</source>
-        <translation>&amp;Fenêtre</translation>
+        <source>Show the %1 help message to get a list with possible Nexalt command-line options</source>
+        <translation>Afficher le %1 message d'aide pour récupérer une liste des options de ligne de commande Nexalt</translation>
     </message>
     <message>
         <source>%1 client</source>
@@ -539,12 +507,6 @@
         <source>Amount: %1
 </source>
         <translation>Montant:%1
-</translation>
-    </message>
-    <message>
-        <source>Wallet: %1
-</source>
-        <translation>Portefeuille : %1
 </translation>
     </message>
     <message>
@@ -590,8 +552,8 @@
         <translation>Le porte-monnaie est &lt;b&gt;chiffré&lt;/b&gt; et est actuellement &lt;b&gt;verrouillé&lt;/b&gt;</translation>
     </message>
     <message>
-        <source>A fatal error occurred. Litecoin can no longer continue safely and will quit.</source>
-        <translation>Une erreur fatale a eu lieu. Litecoin ne peut plus continuer en toute sécurité et va s'éteindre</translation>
+        <source>A fatal error occurred. Nexalt can no longer continue safely and will quit.</source>
+        <translation>Une erreur fatale a eu lieu. Nexalt ne peut plus continuer en toute sécurité et va s'éteindre</translation>
     </message>
 </context>
 <context>
@@ -780,8 +742,8 @@
         <translation>Éditer l'adresse d'envoi</translation>
     </message>
     <message>
-        <source>The entered address "%1" is not a valid Litecoin address.</source>
-        <translation>L'adresse entrée "%1" n'est pas une adresse Litecoin valide.</translation>
+        <source>The entered address "%1" is not a valid Nexalt address.</source>
+        <translation>L'adresse entrée "%1" n'est pas une adresse Nexalt valide.</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -853,8 +815,8 @@
         <translation>Utiliser votre propre répertoire</translation>
     </message>
     <message>
-        <source>Litecoin</source>
-        <translation>Litecoin</translation>
+        <source>Nexalt</source>
+        <translation>Nexalt</translation>
     </message>
     <message>
         <source>At least %1 GB of data will be stored in this directory, and it will grow over time.</source>
@@ -926,6 +888,10 @@
         <translation>Taille du cache de la base de données.</translation>
     </message>
     <message>
+        <source>MB</source>
+        <translation>MO</translation>
+    </message>
+    <message>
         <source>IP address of the proxy (e.g. IPv4: 127.0.0.1 / IPv6: ::1)</source>
         <translation>Adresse IP du proxy (e.g. IPv4: 127.0.0.1 / IPv6: ::1)</translation>
     </message>
@@ -946,8 +912,8 @@
         <translation>Expert</translation>
     </message>
     <message>
-        <source>Automatically open the Litecoin client port on the router. This only works when your router supports UPnP and it is enabled.</source>
-        <translation>Ouvrir le port du client Litecoin automatiquement sur le routeur. Cela ne fonctionne que si votre routeur supporte l'UPnP et si la fonctionnalité est activée.</translation>
+        <source>Automatically open the Nexalt client port on the router. This only works when your router supports UPnP and it is enabled.</source>
+        <translation>Ouvrir le port du client Nexalt automatiquement sur le routeur. Cela ne fonctionne que si votre routeur supporte l'UPnP et si la fonctionnalité est activée.</translation>
     </message>
     <message>
         <source>Map port using &amp;UPnP</source>
@@ -1146,8 +1112,8 @@
         <translation>Montant</translation>
     </message>
     <message>
-        <source>Enter a Litecoin address (e.g. %1)</source>
-        <translation>Entrer une adresse Litecoin (e.g. %1)</translation>
+        <source>Enter a Nexalt address (e.g. %1)</source>
+        <translation>Entrer une adresse Nexalt (e.g. %1)</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -1707,8 +1673,12 @@
         <translation>Demande de paiement expirée.</translation>
     </message>
     <message>
-        <source>Warning: Invalid Litecoin address</source>
-        <translation>Attention: Adresse Litecoin Invalide</translation>
+        <source>Pay only the required fee of %1</source>
+        <translation>Payer seulement les frais obligatoire de %1</translation>
+    </message>
+    <message>
+        <source>Warning: Invalid Nexalt address</source>
+        <translation>Attention: Adresse Nexalt Invalide</translation>
     </message>
     <message>
         <source>(no label)</source>
@@ -2217,13 +2187,6 @@
     <name>UnitDisplayStatusBarControl</name>
     </context>
 <context>
-    <name>WalletController</name>
-    <message>
-        <source>Close wallet</source>
-        <translation>Fermer portefeuille</translation>
-    </message>
-    </context>
-<context>
     <name>WalletFrame</name>
     <message>
         <source>No wallet has been loaded.</source>
@@ -2236,11 +2199,7 @@
         <source>Send Coins</source>
         <translation>Envoyer des pièces</translation>
     </message>
-    <message>
-        <source>default wallet</source>
-        <translation>portefeuille par défaut</translation>
-    </message>
-</context>
+    </context>
 <context>
     <name>WalletView</name>
     <message>
@@ -2275,17 +2234,13 @@
         <translation>Impossible de démarrer le serveur HTTP. Voir le journal de débogage pour plus de détails.</translation>
     </message>
     <message>
-        <source>Litecoin Core</source>
-        <translation>Litecoin Core</translation>
+        <source>Nexalt Core</source>
+        <translation>Nexalt Core</translation>
     </message>
     <message>
         <source>Importing...</source>
         <translation>
 Importation ...</translation>
-    </message>
-    <message>
-        <source>Upgrading UTXO database</source>
-        <translation>Mise à jour de la base de données des UTXO</translation>
     </message>
     <message>
         <source>Verifying blocks...</source>
@@ -2322,10 +2277,6 @@ Importation ...</translation>
     <message>
         <source>Transaction too large</source>
         <translation>Transaction trop grande</translation>
-    </message>
-    <message>
-        <source>Unable to generate initial keys</source>
-        <translation>Impossible de générer la clé initiale</translation>
     </message>
     <message>
         <source>Warning</source>

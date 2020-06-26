@@ -66,12 +66,12 @@
         <translation>Получаване на адреси</translation>
     </message>
     <message>
-        <source>These are your Litecoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
+        <source>These are your Nexalt addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
         <translation>Това са адресите на получателите на плащания. Винаги проверявайте размера на сумата и адреса на получателя, преди да изпратите монети.</translation>
     </message>
     <message>
-        <source>These are your Litecoin addresses for receiving payments. It is recommended to use a new receiving address for each transaction.</source>
-        <translation>Това са Вашите Litecoin адреси,благодарение на които ще получавате плащания.Препоръчително е да използвате нови адреси за получаване на всяка транзакция.</translation>
+        <source>These are your Nexalt addresses for receiving payments. It is recommended to use a new receiving address for each transaction.</source>
+        <translation>Това са Вашите Nexalt адреси,благодарение на които ще получавате плащания.Препоръчително е да използвате нови адреси за получаване на всяка транзакция.</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -136,10 +136,6 @@
         <translation>Въведете новата парола повторно</translation>
     </message>
     <message>
-        <source>Show password</source>
-        <translation>Покажи парола</translation>
-    </message>
-    <message>
         <source>Enter the new passphrase to the wallet.&lt;br/&gt;Please use a passphrase of &lt;b&gt;ten or more random characters&lt;/b&gt;, or &lt;b&gt;eight or more words&lt;/b&gt;.</source>
         <translation>Въведете новата парола към портфейла.&lt;br/&gt;Моля ползвайте парола съставена от &lt;b&gt;десет или повече произволни символа&lt;/b&gt;, или &lt;b&gt;осем или повече думи&lt;/b&gt;.</translation>
     </message>
@@ -176,7 +172,7 @@
         <translation>Потвърдете на шифрирането на портфейла</translation>
     </message>
     <message>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR LITECOINS&lt;/b&gt;!</source>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR NEXALTS&lt;/b&gt;!</source>
         <translation>ВНИМАНИЕ: Ако шифрирате вашият портфейл и изгубите паролата си, &lt;b&gt;ЩЕ ИЗГУБИТЕ ВСИЧКИТЕ СИ БИТКОИНИ&lt;/b&gt;!</translation>
     </message>
     <message>
@@ -250,6 +246,10 @@
         <translation>&amp;Баланс</translation>
     </message>
     <message>
+        <source>Node</source>
+        <translation>Сървър</translation>
+    </message>
+    <message>
         <source>Show general overview of wallet</source>
         <translation>Обобщена информация за портфейла</translation>
     </message>
@@ -306,12 +306,16 @@
         <translation>&amp;Смяна на паролата...</translation>
     </message>
     <message>
-        <source>Open &amp;URI...</source>
-        <translation>Отвори &amp;URI...</translation>
+        <source>&amp;Sending addresses...</source>
+        <translation>&amp;Изпращане на адресите...</translation>
     </message>
     <message>
-        <source>Wallet:</source>
-        <translation>Портфейл</translation>
+        <source>&amp;Receiving addresses...</source>
+        <translation>&amp;Получаване на адресите...</translation>
+    </message>
+    <message>
+        <source>Open &amp;URI...</source>
+        <translation>Отвори &amp;URI...</translation>
     </message>
     <message>
         <source>Click to disable network activity.</source>
@@ -326,15 +330,11 @@
         <translation>Натиснете за повторно активиране на мрежата.</translation>
     </message>
     <message>
-        <source>Syncing Headers (%1%)...</source>
-        <translation>Синхронизиране на хедъри (%1%)</translation>
-    </message>
-    <message>
         <source>Reindexing blocks on disk...</source>
         <translation>Повторно индексиране на блоковете на диска...</translation>
     </message>
     <message>
-        <source>Send coins to a Litecoin address</source>
+        <source>Send coins to a Nexalt address</source>
         <translation>Изпращане към Биткоин адрес</translation>
     </message>
     <message>
@@ -358,8 +358,12 @@
         <translation>&amp;Проверка на съобщение...</translation>
     </message>
     <message>
-        <source>Litecoin</source>
+        <source>Nexalt</source>
         <translation>Биткоин</translation>
+    </message>
+    <message>
+        <source>Wallet</source>
+        <translation>Портфейл</translation>
     </message>
     <message>
         <source>&amp;Send</source>
@@ -382,12 +386,12 @@
         <translation>Шифроване на личните ключове,които принадлежат на портфейла Ви.</translation>
     </message>
     <message>
-        <source>Sign messages with your Litecoin addresses to prove you own them</source>
-        <translation>Пишете съобщения със своя Litecoin адрес за да докажете,че е ваш.</translation>
+        <source>Sign messages with your Nexalt addresses to prove you own them</source>
+        <translation>Пишете съобщения със своя Nexalt адрес за да докажете,че е ваш.</translation>
     </message>
     <message>
-        <source>Verify messages to ensure they were signed with specified Litecoin addresses</source>
-        <translation>Потвърждаване на съобщения  за да се знае,че са написани с дадените Litecoin адреси.</translation>
+        <source>Verify messages to ensure they were signed with specified Nexalt addresses</source>
+        <translation>Потвърждаване на съобщения  за да се знае,че са написани с дадените Nexalt адреси.</translation>
     </message>
     <message>
         <source>&amp;File</source>
@@ -406,8 +410,8 @@
         <translation>Раздели</translation>
     </message>
     <message>
-        <source>Request payments (generates QR codes and litecoin: URIs)</source>
-        <translation>Изискване на плащания(генерира QR кодове и Litecoin: URIs)</translation>
+        <source>Request payments (generates QR codes and nexalt: URIs)</source>
+        <translation>Изискване на плащания(генерира QR кодове и Nexalt: URIs)</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -418,8 +422,8 @@
         <translation>Покажи списък с използваните адреси и имена.</translation>
     </message>
     <message>
-        <source>Open a litecoin: URI or payment request</source>
-        <translation>Отворете Litecoin: URI  или заявка за плащане</translation>
+        <source>Open a nexalt: URI or payment request</source>
+        <translation>Отворете Nexalt: URI  или заявка за плащане</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
@@ -462,20 +466,8 @@
         <translation>Синхронизиран</translation>
     </message>
     <message>
-        <source>Show the %1 help message to get a list with possible Litecoin command-line options</source>
-        <translation>Покажи %1 помощно съобщение за да получиш лист с възможни Litecoin команди</translation>
-    </message>
-    <message>
-        <source>default wallet</source>
-        <translation>Портфейл по подразбиране</translation>
-    </message>
-    <message>
-        <source>&amp;Window</source>
-        <translation>&amp;Прозорец</translation>
-    </message>
-    <message>
-        <source>Minimize</source>
-        <translation>Минимизирай</translation>
+        <source>Show the %1 help message to get a list with possible Nexalt command-line options</source>
+        <translation>Покажи %1 помощно съобщение за да получиш лист с възможни Nexalt команди</translation>
     </message>
     <message>
         <source>%1 client</source>
@@ -536,8 +528,8 @@
         <translation>Портфейлът е &lt;b&gt;криптиран&lt;/b&gt; и &lt;b&gt;заключен&lt;/b&gt;</translation>
     </message>
     <message>
-        <source>A fatal error occurred. Litecoin can no longer continue safely and will quit.</source>
-        <translation>Възникна фатална грешка. Litecoin не може да продължи безопасно и ще се изключи.</translation>
+        <source>A fatal error occurred. Nexalt can no longer continue safely and will quit.</source>
+        <translation>Възникна фатална грешка. Nexalt не може да продължи безопасно и ще се изключи.</translation>
     </message>
 </context>
 <context>
@@ -718,7 +710,7 @@
         <translation>Редактиране на адрес за изпращане</translation>
     </message>
     <message>
-        <source>The entered address "%1" is not a valid Litecoin address.</source>
+        <source>The entered address "%1" is not a valid Nexalt address.</source>
         <translation>"%1" не е валиден Биткоин адрес.</translation>
     </message>
     <message>
@@ -795,7 +787,7 @@
         <translation>Използване на директория ръчно</translation>
     </message>
     <message>
-        <source>Litecoin</source>
+        <source>Nexalt</source>
         <translation>Биткоин</translation>
     </message>
     <message>
@@ -860,6 +852,10 @@
         <translation>Размер на кеша в &amp;базата данни</translation>
     </message>
     <message>
+        <source>MB</source>
+        <translation>Мегабайта</translation>
+    </message>
+    <message>
         <source>Number of script &amp;verification threads</source>
         <translation>Брой на скриптове и &amp;нишки за потвърждение</translation>
     </message>
@@ -880,10 +876,6 @@
         <translation>&amp;Мрежа</translation>
     </message>
     <message>
-        <source>GB</source>
-        <translation>ГБ</translation>
-    </message>
-    <message>
         <source>W&amp;allet</source>
         <translation>По&amp;ртфейл</translation>
     </message>
@@ -900,24 +892,16 @@
         <translation>&amp;Похарчете непотвърденото ресто</translation>
     </message>
     <message>
-        <source>Automatically open the Litecoin client port on the router. This only works when your router supports UPnP and it is enabled.</source>
-        <translation>Автоматично отваряне на входящия Litecoin порт. Работи само с рутери поддържащи UPnP.</translation>
+        <source>Automatically open the Nexalt client port on the router. This only works when your router supports UPnP and it is enabled.</source>
+        <translation>Автоматично отваряне на входящия Nexalt порт. Работи само с рутери поддържащи UPnP.</translation>
     </message>
     <message>
         <source>Map port using &amp;UPnP</source>
         <translation>Отваряне на входящия порт чрез &amp;UPnP</translation>
     </message>
     <message>
-        <source>Accept connections from outside.</source>
-        <translation>Позволи външни връзки</translation>
-    </message>
-    <message>
-        <source>Allow incomin&amp;g connections</source>
-        <translation>Позволи входящи връзки</translation>
-    </message>
-    <message>
-        <source>Connect to the Litecoin network through a SOCKS5 proxy.</source>
-        <translation>Свързване с Litecoin мрежата чрез SOCKS5  прокси.</translation>
+        <source>Connect to the Nexalt network through a SOCKS5 proxy.</source>
+        <translation>Свързване с Nexalt мрежата чрез SOCKS5  прокси.</translation>
     </message>
     <message>
         <source>&amp;Connect through SOCKS5 proxy (default proxy):</source>
@@ -934,10 +918,6 @@
     <message>
         <source>Port of the proxy (e.g. 9050)</source>
         <translation>Порт на прокси сървъра (пр. 9050)</translation>
-    </message>
-    <message>
-        <source>Tor</source>
-        <translation>Тор</translation>
     </message>
     <message>
         <source>&amp;Window</source>
@@ -1000,10 +980,6 @@
         <translation>Изисква се рестартиране на клиента за активиране на извършените промени.</translation>
     </message>
     <message>
-        <source>Client will be shut down. Do you want to proceed?</source>
-        <translation>Клиентът ще бъде изключен. Искате ли да продължите?</translation>
-    </message>
-    <message>
         <source>Error</source>
         <translation>Грешка</translation>
     </message>
@@ -1023,7 +999,7 @@
         <translation>Формуляр</translation>
     </message>
     <message>
-        <source>The displayed information may be out of date. Your wallet automatically synchronizes with the Litecoin network after a connection is established, but this process has not completed yet.</source>
+        <source>The displayed information may be out of date. Your wallet automatically synchronizes with the Nexalt network after a connection is established, but this process has not completed yet.</source>
         <translation>Текущата информация на екрана може да не е актуална. Вашият портфейл ще се синхронизира автоматично с мрежата на Биткоин, щом поне една връзката с нея се установи; този процес все още не е приключил.</translation>
     </message>
     <message>
@@ -1078,8 +1054,8 @@
         <translation>Възникна грешка по време назаявката за плащане</translation>
     </message>
     <message>
-        <source>Cannot start litecoin: click-to-pay handler</source>
-        <translation>Litecoin не можe да се стартира: click-to-pay handler</translation>
+        <source>Cannot start nexalt: click-to-pay handler</source>
+        <translation>Nexalt не можe да се стартира: click-to-pay handler</translation>
     </message>
     <message>
         <source>URI handling</source>
@@ -1160,8 +1136,8 @@
         <translation>Сума</translation>
     </message>
     <message>
-        <source>Enter a Litecoin address (e.g. %1)</source>
-        <translation>Въведете Litecoin адрес (например: %1)</translation>
+        <source>Enter a Nexalt address (e.g. %1)</source>
+        <translation>Въведете Nexalt адрес (например: %1)</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -1701,8 +1677,8 @@
         <translation>Заявката за плащане е изтекла.</translation>
     </message>
     <message>
-        <source>Warning: Invalid Litecoin address</source>
-        <translation>Внимание: Невалиден Litecoin адрес</translation>
+        <source>Warning: Invalid Nexalt address</source>
+        <translation>Внимание: Невалиден Nexalt адрес</translation>
     </message>
     <message>
         <source>Warning: Unknown change address</source>
@@ -1821,7 +1797,7 @@
         <translation>Копиране на текущия подпис</translation>
     </message>
     <message>
-        <source>Sign the message to prove you own this Litecoin address</source>
+        <source>Sign the message to prove you own this Nexalt address</source>
         <translation>Подпишете съобщение като доказателство, че притежавате определен адрес</translation>
     </message>
     <message>
@@ -1837,7 +1813,7 @@
         <translation>&amp;Провери</translation>
     </message>
     <message>
-        <source>Verify the message to ensure it was signed with the specified Litecoin address</source>
+        <source>Verify the message to ensure it was signed with the specified Nexalt address</source>
         <translation>Проверете съобщение, за да сте сигурни че е подписано с определен Биткоин адрес</translation>
     </message>
     <message>
@@ -2271,9 +2247,6 @@
     <name>UnitDisplayStatusBarControl</name>
     </context>
 <context>
-    <name>WalletController</name>
-    </context>
-<context>
     <name>WalletFrame</name>
     <message>
         <source>No wallet has been loaded.</source>
@@ -2286,11 +2259,7 @@
         <source>Send Coins</source>
         <translation>Изпращане</translation>
     </message>
-    <message>
-        <source>default wallet</source>
-        <translation>Портфейл по подразбиране</translation>
-    </message>
-</context>
+    </context>
 <context>
     <name>WalletView</name>
     <message>
@@ -2329,8 +2298,8 @@
 <context>
     <name>bitcoin-core</name>
     <message>
-        <source>Litecoin Core</source>
-        <translation>Litecoin ядро</translation>
+        <source>Nexalt Core</source>
+        <translation>Nexalt ядро</translation>
     </message>
     <message>
         <source>Do you want to rebuild the block database now?</source>

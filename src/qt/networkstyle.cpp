@@ -17,7 +17,7 @@ static const struct {
 } network_styles[] = {
     {"main", QAPP_APP_NAME_DEFAULT, 0, 0, ""},
     {"test", QAPP_APP_NAME_TESTNET, 0, 0, QT_TRANSLATE_NOOP("SplashScreen", "[testnet]")},
-    {"regtest", QAPP_APP_NAME_REGTEST, 60, 1, "[regtest]"}
+    {"regtest", QAPP_APP_NAME_TESTNET, 60, 1, "[regtest]"}
 };
 static const unsigned network_styles_count = sizeof(network_styles)/sizeof(*network_styles);
 
@@ -31,7 +31,7 @@ NetworkStyle::NetworkStyle(const QString &_appName, const int iconColorHueShift,
     if (std::char_traits<char>::length(_titleAddText) == 0) {
         pixmap.load(":/icons/bitcoin");
     } else {
-        pixmap.load(":/icons/litecoin_splash");
+        pixmap.load(":/icons/nexalt_splash");
     }
 
     if(iconColorHueShift != 0 && iconColorSaturationReduction != 0)
@@ -93,5 +93,5 @@ const NetworkStyle *NetworkStyle::instantiate(const QString &networkId)
                     network_styles[x].titleAddText);
         }
     }
-    return nullptr;
+    return 0;
 }
