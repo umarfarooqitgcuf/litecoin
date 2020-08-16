@@ -534,6 +534,32 @@
      </item>
     </layout>
    </item>
+   <item>
+    <widget class="QPushButton" name="buttontoaddkey">
+     <property name="minimumSize">
+      <size>
+       <width>50</width>
+       <height>30</height>
+      </size>
+     </property>
+     <property name="toolTip">
+      <string>To add Sponsor Ship key</string>
+     </property>
+     <property name="text">
+      <string>Add MLC Key</string>
+     </property>
+     <property name="icon">
+      <iconset resource="../bitcoin.qrc">
+       <normaloff>:/icons/add</normaloff>:/icons/add</iconset>
+     </property>
+     <property name="autoDefault">
+      <bool>false</bool>
+     </property>
+     <property name="default">
+      <bool>false</bool>
+     </property>
+    </widget>
+   </item>
   </layout>
  </widget>
  <resources/>

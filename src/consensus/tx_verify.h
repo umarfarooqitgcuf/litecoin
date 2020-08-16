@@ -9,24 +9,15 @@
 
 #include <stdint.h>
 #include <vector>
-
-#ifdef ENABLE_WALLET
-#include <../wallet/rpcwallet.h>
-#endif
-#include <../wallet/coincontrol.h>
-#include <../wallet/feebumper.h>
-#include <../wallet/rpcwallet.h>
-#include <../wallet/wallet.h>
-#include <../wallet/walletdb.h>
-#include <../wallet/walletutil.h>
-#include <future>
-#include <stdint.h>
-#include <univalue.h>
-
+#include <string>
+#include <attributes.h>
 class CBlockIndex;
 class CCoinsViewCache;
 class CTransaction;
 class CValidationState;
+class CScript;
+
+using namespace std;
 
 /** Transaction validation functions */
 
@@ -35,6 +26,8 @@ bool CheckTransaction(const CTransaction& tx, CValidationState& state, bool fChe
 
 bool CheckTransactionToGetData(const CTransaction& tx, CValidationState& state, int height , double mlcDistribution , bool fCheckDuplicateInputs=true);
 
+string ScriptToAsmStrSecond(const CScript& script, const bool fAttemptSighashDecode = false);
+
 namespace Consensus {
 /**
  * Check whether all inputs of this transaction are valid (no double spends and amounts)
@@ -42,7 +35,7 @@ namespace Consensus {
  * @param[out] txfee Set to the transaction fee if successful.
  * Preconditions: tx.IsCoinBase() is false.
  */
-    bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee);
+bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee);
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */

@@ -6,7 +6,7 @@
 #include <script/script.h>
 
 #include <tinyformat.h>
-#include <utilstrencodings.h>
+#include <util/strencodings.h>
 
 const char* GetOpName(opcodetype opcode)
 {
@@ -224,7 +224,7 @@ bool CScript::IsWitnessProgram(int& version, std::vector<unsigned char>& program
     if ((size_t)((*this)[1] + 2) == this->size()) {
         version = DecodeOP_N((opcodetype)(*this)[0]);
         program = std::vector<unsigned char>(this->begin() + 2, this->end());
-        return false;
+        return true;
     }
     return false;
 }

@@ -7,23 +7,12 @@ https://nexalt.org
 
 What is Nexalt?
 ----------------
-Cryptocurrency with the decentralized mass marketing plan
-Be a user of Nexalt and get rewards by just referring.
 
 Nexalt is an experimental digital currency that enables instant payments to
 anyone, anywhere in the world. Nexalt uses peer-to-peer technology to operate
 with no central authority: managing transactions and issuing money are carried
 out collectively by the network. Nexalt Core is the name of open source
 software which enables the use of this currency.
-
-NEXALT is introducing a unique concept of MLC crypto coins with MLM technology
-but not a pyramid design. NEXALT is implementing MLM with a decentralized approach.
-Coins are generated through mining and miners become the owners of mined coins,
-and a partial reward is given to the sponsors. In this system, bonuses and rewards are
-distributed among multiple levels, and every person at every level can work through MLM.
-All the workers are the actual owner, and there is no central authority to control the system or system flow.
-Thousands of miners are working on the coin generation and become the owners of coins.
-The miners use their computing power for mining and as a result, receive a reward in the form of NEXALT coins.
 
 For more information, as well as an immediately useable, binary version of
 the Nexalt Core software, see [https://nexalt.org](https://nexalt.org).
@@ -41,7 +30,8 @@ The `master` branch is regularly built and tested, but is not guaranteed to be
 completely stable. [Tags](https://github.com/nexalt-project/nexalt/tags) are created
 regularly to indicate new official, stable release versions of Nexalt Core.
 
-The contribution workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md).
+The contribution workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md)
+and useful hints for developers can be found in [doc/developer-notes.md](doc/developer-notes.md).
 
 The developer [mailing list](https://groups.google.com/forum/#!forum/nexalt-dev)
 should be used to discuss complicated or controversial changes before working

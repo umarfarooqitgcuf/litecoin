@@ -43,9 +43,9 @@ QString BitcoinUnits::longName(int unit)
     switch(unit)
     {
     case BTC: return QString("XLT");
-    case mBTC: return QString("nexi");
-    case uBTC: return QString("nexon");
-    case SAT: return QString("nexoshi");
+    case mBTC: return QString("Nexi");
+    case uBTC: return QString("Nexon");
+    case SAT: return QString("Nexoshis");
     default: return QString("???");
     }
 }
