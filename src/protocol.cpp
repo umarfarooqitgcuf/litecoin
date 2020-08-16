@@ -5,8 +5,8 @@
 
 #include <protocol.h>
 
-#include <util.h>
-#include <utilstrencodings.h>
+#include <util/system.h>
+#include <util/strencodings.h>
 
 #ifndef WIN32
 # include <arpa/inet.h>
@@ -42,8 +42,6 @@ const char *SENDCMPCT="sendcmpct";
 const char *CMPCTBLOCK="cmpctblock";
 const char *GETBLOCKTXN="getblocktxn";
 const char *BLOCKTXN="blocktxn";
-/*const char *MLCKEYS="MLC_KEYS";
-const char *NOMLCKEYS="NO_MLC_KEYS";*/
 } // namespace NetMsgType
 
 /** All known message types. Keep this in the same order as the list of

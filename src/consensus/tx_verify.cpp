@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2017 The Bitcoin Core developers
+// Copyright (c) 2017-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,19 +12,7 @@
 // TODO remove the following dependencies
 #include <chain.h>
 #include <coins.h>
-#include <utilmoneystr.h>
-
-#include <consensus/consensus.h>
-#include <consensus/validation.h>
-#include <key_io.h>
-#include <script/script.h>
-#include <script/standard.h>
-#include <serialize.h>
-#include <streams.h>
-#include <univalue.h>
-#include <util.h>
-#include <utilmoneystr.h>
-#include <utilstrencodings.h>
+#include <util/moneystr.h>
 
 #include <cassert>
 #include "leveldb/db.h"
@@ -43,8 +31,9 @@
 #include <../wallet/walletutil.h>
 #include <future>
 #include <stdint.h>
-#include <univalue.h>
 #include <core_io.h>
+#include <key_io.h>
+
 #include <consensus/consensus.h>
 #include <consensus/validation.h>
 #include <key_io.h>
@@ -53,10 +42,9 @@
 #include <serialize.h>
 #include <streams.h>
 #include <univalue.h>
-#include <util.h>
-#include <utilmoneystr.h>
-#include <utilstrencodings.h>
-
+#include <util/system.h>
+#include <util/moneystr.h>
+#include <util/strencodings.h>
 using namespace std;
 
 vector <string> explode_raw_tx_verify(const string &delimiter, const string &explodeme);
@@ -145,7 +133,6 @@ string hexToString_tx_verify(string str) {
     return output_string;
 }
 
-
 bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
 {
     if (tx.nLockTime == 0)
@@ -175,7 +162,7 @@ std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx, int flags
     // we would be doing a signed comparison and half the range of nVersion
     // wouldn't support BIP 68.
     bool fEnforceBIP68 = static_cast<uint32_t>(tx.nVersion) >= 2
-                         && flags & LOCKTIME_VERIFY_SEQUENCE;
+                      && flags & LOCKTIME_VERIFY_SEQUENCE;
 
     // Do not enforce sequence numbers as a relative lock time
     // unless we have been instructed to
@@ -296,7 +283,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
     if (tx.vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
     // Size limits (this doesn't take the witness into account, as that hasn't been checked for malleability)
-    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * WITNESS_SCALE_FACTOR > MAX_BLOCK_WEIGHT)
+    if (::GetSerializeSize(tx, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * WITNESS_SCALE_FACTOR > MAX_BLOCK_WEIGHT)
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
 
     // Check for negative or overflow output values
@@ -349,7 +336,7 @@ bool CheckTransactionToGetData(const CTransaction &tx, CValidationState &state, 
     if (tx.vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
     // Size limits (this doesn't take the witness into account, as that hasn't been checked for malleability)
-    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) *
+    if (::GetSerializeSize(tx, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) *
         WITNESS_SCALE_FACTOR > MAX_BLOCK_WEIGHT)
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
 
@@ -440,7 +427,7 @@ bool CheckTransactionToGetData(const CTransaction &tx, CValidationState &state, 
         }
     } else {
         for (const auto &txout : tx.vout) {
-            std::string asmstring = ScriptToAsmStr(txout.scriptPubKey);
+            string asmstring = ScriptToAsmStrSecond(txout.scriptPubKey);
             std::vector <std::string> no_keys = explode_raw_tx_verify(" ", asmstring);
             if (no_keys[0] == "OP_RETURN") {
                 hexconverted = hexToString_tx_verify(no_keys[1]);
@@ -537,8 +524,8 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
         // If prev is coinbase, check that it's matured
         if (coin.IsCoinBase() && nSpendHeight - coin.nHeight < COINBASE_MATURITY) {
             return state.Invalid(false,
-                                 REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
-                                 strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
+                REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
+                strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
         }
 
         // Check for negative or overflow input values
@@ -551,7 +538,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
     const CAmount value_out = tx.GetValueOut();
     if (nValueIn < value_out) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-belowout", false,
-                         strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(value_out)));
+            strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(value_out)));
     }
 
     // Tally transaction fees
@@ -562,4 +549,56 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, c
 
     txfee = txfee_aux;
     return true;
+}
+const std::map<unsigned char, std::string> mapSigHashTypes = {
+        {static_cast<unsigned char>(SIGHASH_ALL), std::string("ALL")},
+        {static_cast<unsigned char>(SIGHASH_ALL|SIGHASH_ANYONECANPAY), std::string("ALL|ANYONECANPAY")},
+        {static_cast<unsigned char>(SIGHASH_NONE), std::string("NONE")},
+        {static_cast<unsigned char>(SIGHASH_NONE|SIGHASH_ANYONECANPAY), std::string("NONE|ANYONECANPAY")},
+        {static_cast<unsigned char>(SIGHASH_SINGLE), std::string("SINGLE")},
+        {static_cast<unsigned char>(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY), std::string("SINGLE|ANYONECANPAY")},
+};
+
+std::string ScriptToAsmStrSecond(const CScript& script, const bool fAttemptSighashDecode)
+{
+    std::string str;
+    opcodetype opcode;
+    std::vector<unsigned char> vch;
+    CScript::const_iterator pc = script.begin();
+    while (pc < script.end()) {
+        if (!str.empty()) {
+            str += " ";
+        }
+        if (!script.GetOp(pc, opcode, vch)) {
+            str += "[error]";
+            return str;
+        }
+        if (0 <= opcode && opcode <= OP_PUSHDATA4) {
+            if (vch.size() <= static_cast<std::vector<unsigned char>::size_type>(4)) {
+                str += strprintf("%d", CScriptNum(vch, false).getint());
+            } else {
+                // the IsUnspendable check makes sure not to try to decode OP_RETURN data that may match the format of a signature
+                if (fAttemptSighashDecode && !script.IsUnspendable()) {
+                    std::string strSigHashDecode;
+                    // goal: only attempt to decode a defined sighash type from data that looks like a signature within a scriptSig.
+                    // this won't decode correctly formatted public keys in Pubkey or Multisig scripts due to
+                    // the restrictions on the pubkey formats (see IsCompressedOrUncompressedPubKey) being incongruous with the
+                    // checks in CheckSignatureEncoding.
+                    if (CheckSignatureEncoding(vch, SCRIPT_VERIFY_STRICTENC, nullptr)) {
+                        const unsigned char chSigHashType = vch.back();
+                        if (mapSigHashTypes.count(chSigHashType)) {
+                            strSigHashDecode = "[" + mapSigHashTypes.find(chSigHashType)->second + "]";
+                            vch.pop_back(); // remove the sighash type byte. it will be replaced by the decode.
+                        }
+                    }
+                    str += HexStr(vch) + strSigHashDecode;
+                } else {
+                    str += HexStr(vch);
+                }
+            }
+        } else {
+            str += GetOpName(opcode);
+        }
+    }
+    return str;
 }

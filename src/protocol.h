@@ -238,7 +238,6 @@ extern const char *GETBLOCKTXN;
  * @since protocol version 70014 as described by BIP 152
  */
 extern const char *BLOCKTXN;
-
 };
 
 /* Get a vector of all valid message types (see above) */
@@ -403,7 +402,6 @@ public:
     std::string GetCommand() const;
     std::string ToString() const;
 
-    // TODO: make private (improves encapsulation)
 public:
     int type;
     uint256 hash;
