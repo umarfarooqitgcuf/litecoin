@@ -78,3 +78,19 @@ Translations are periodically pulled from Transifex and merged into the git repo
 
 **Important**: We do not accept translation changes as GitHub pull requests because the next
 pull from Transifex would automatically overwrite them again.
+
+How To Add sponsor Key?
+------------
+You can Add sponsor key by following methods:
+
+1
+---
+GUI Method:
+To add sponsor key you must need some amount in your wallet to pay some basic fee.
+On main overview page their is a Button "Add sponsor Key" click on it a popup shows Add the key of your sponsor in it and click ok and than wait for some time that your key should be mined in BlockChain.
+
+2
+---
+Console Method:
+To add sponsor key you must need some amount in your wallet to pay some basic fee.
+Than call "addmlckeyraw" and pass sponsor's key as argument and wait for some time that your key should be mined in BlockChain. 
