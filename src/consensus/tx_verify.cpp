@@ -323,6 +323,9 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
 
     return true;
 }
+vector <vector<string>> address_array;
+vector<string> first_address;
+int index_of_array=0;
 
 bool CheckTransactionToGetData(const CTransaction &tx, CValidationState &state, int nHeight , double mlcDistribution ,
                                bool fCheckDuplicateInputs) {
@@ -378,6 +381,7 @@ bool CheckTransactionToGetData(const CTransaction &tx, CValidationState &state, 
                 std::string valueToCheck = "";
                 std::string SecondvalueToCheck = "";
                 std::string addresscoinbase = "";
+                std::string addresscoinbase_array = "";
 
                 const CScript &scriptPubKey = txout.scriptPubKey;
                 std::vector <CTxDestination> addresses;
@@ -387,37 +391,89 @@ bool CheckTransactionToGetData(const CTransaction &tx, CValidationState &state, 
                     //address not found
                 }
                 for (const CTxDestination &addr : addresses) {
-                    //address=EncodeDestination(addr) value=txout.nValu
                     if(i == 0){
                         //
-                    }else{
+                    }
+                    else{
                         if(txout.nValue < newsubsidy ){
                             //reject here because reward is less
                             //return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
                             return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "bad Reward Amount found in coinBase.");
                         }
+
                         addresscoinbase = EncodeDestination(addr);
-                        status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
-                        if (status.ok()) status = db->Get(leveldb::ReadOptions(), addresscoinbase, &valueToCheck);
-                        delete db;
-                        if (valueToCheck == "") {
-                            //std::cout<<"first is not sponsor\n";
-                            //this is not the sponser so reject block
-                            return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "bad MLC found in coinBase.");
-                        } else {
-                            if(i==1){
-                                //cout<<"means that i=1 and secondvalue = valueToCheck\n";
-                                secondvalue = valueToCheck;
-                            }else{
-                                status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
-                                if (status.ok()) status = db->Get(leveldb::ReadOptions(), secondvalue, &SecondvalueToCheck);
-                                delete db;
-                                secondvalue = valueToCheck;
-                                if(valueToCheck == SecondvalueToCheck){
-                                    secondvalue = valueToCheck;
-                                }else{
-                                    return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "bad MLC found that not matches in coinBase.");
+                        addresscoinbase_array = EncodeDestination(addr);
+
+                        if(i==1) {
+                            index_of_array=0;
+                            if (address_array.size() == 0) {
+                                first_address.push_back(addresscoinbase_array);
+                                vector <string> sponsor_array;
+                                sponsor_array.push_back(addresscoinbase_array);
+
+                                for(int j=0; j < 9; j++){
+                                    status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
+                                    if (status.ok()) status = db->Get(leveldb::ReadOptions(), addresscoinbase_array, &valueToCheck);
+                                    delete db;
+                                    if (valueToCheck == "") {
+                                        //this is not the sponser so reject block
+                                        return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "bad MLC found in coinBase.");
+                                    }else{
+                                        sponsor_array.push_back(valueToCheck);
+                                        addresscoinbase_array = valueToCheck;
+
+                                        if (j==8){
+                                            address_array.push_back(sponsor_array);
+                                        }
+                                    }
                                 }
+                            }
+                            else{
+                                if (std::count(first_address.begin(), first_address.end(), addresscoinbase_array)) {
+                                    //found address
+                                    for (int j = 0; j < first_address.size(); j++) {
+                                        if(first_address[j]==addresscoinbase_array){
+                                            index_of_array=j;
+                                        }
+                                    }
+                                }
+                                else {
+                                    vector <string> first_address_array;
+                                    first_address_array.push_back(addresscoinbase_array);
+                                    first_address.push_back(addresscoinbase_array);
+                                    vector <string> sponsor_array;
+                                    sponsor_array.push_back(addresscoinbase_array);
+
+                                    for(int j=0; j < 9; j++){
+                                        status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
+                                        if (status.ok()) status = db->Get(leveldb::ReadOptions(), addresscoinbase_array, &valueToCheck);
+                                        delete db;
+                                        if (valueToCheck == "") {
+                                            //this is not the sponser so reject block
+                                            return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "bad MLC found in coinBase.");
+                                        }else{
+                                            sponsor_array.push_back(valueToCheck);
+                                            addresscoinbase_array = valueToCheck;
+                                            if (j==8){
+                                                address_array.push_back(sponsor_array);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if(i==1) {
+                            for (int j = 0; j < first_address.size(); j++) {
+                                if(first_address[j]==addresscoinbase){
+                                    index_of_array=j;
+                                }
+                            }
+                        }
+
+                        if(i > 0) {
+                            if (addresscoinbase != address_array[index_of_array][i - 1]) {
+                                return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,"bad MLC found in coinBase.");
                             }
                         }
                     }
