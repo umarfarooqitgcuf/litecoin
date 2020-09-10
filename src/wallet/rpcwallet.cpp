@@ -363,13 +363,6 @@ static UniValue sendtoaddress(const JSONRPCRequest& request)
     if (request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) == WALLET_ENDPOINT_BASE) {
         wallet_name = urlDecode(request.URI.substr(WALLET_ENDPOINT_BASE.size()));
     }
-    if(!request.fHelp) {
-        bool dbCheck = IsKeySaved(wallet_name);
-        if (!dbCheck) {
-            throw JSONRPCError(RPC_WALLET_ERROR,
-                               "Your sponsor key is not added. Kindly add it using console command <addmlckeyraw sponsor_key>.");
-        }
-    }
 
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     CWallet* const pwallet = wallet.get();
@@ -827,13 +820,6 @@ static UniValue sendmany(const JSONRPCRequest& request)
     std::string wallet_name;
     if (request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) == WALLET_ENDPOINT_BASE) {
         wallet_name = urlDecode(request.URI.substr(WALLET_ENDPOINT_BASE.size()));
-    }
-    if(!request.fHelp) {
-        bool dbCheck = IsKeySaved(wallet_name);
-        if (!dbCheck) {
-            throw JSONRPCError(RPC_WALLET_ERROR,
-                               "Your sponsor key is not added. Kindly add it using console command <addmlckeyraw sponsor_key>.");
-        }
     }
 
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);

@@ -326,16 +326,6 @@ SendCoinsDialog::~SendCoinsDialog()
 
 void SendCoinsDialog::on_sendButton_clicked()
 {
-    const QString name_wallet = model->getWalletName();
-    std::string walletName = name_wallet.toStdString();
-    bool isEmpty = dbEmptyCheck(walletName);
-    if (isEmpty) {
-        bool KeySaved = saveMlcKey(walletName);
-        if(KeySaved){
-            QMessageBox::critical(this, tr("Sponsor Key Added"),
-                                  tr("Your sponsor key is added now you can make transactions"));
-        }
-    } else {
         if (!model || !model->getOptionsModel())
             return;
 
@@ -503,7 +493,6 @@ void SendCoinsDialog::on_sendButton_clicked()
             Q_EMIT coinsSent(currentTransaction.getWtx()->get().GetHash());
         }
         fNewRecipientAllowed = true;
-    }
 }
 
 bool SendCoinsDialog::dbEmptyCheck(std::string wallet_name) {
