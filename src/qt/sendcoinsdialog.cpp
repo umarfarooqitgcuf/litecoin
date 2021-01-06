@@ -193,6 +193,9 @@ SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *p
     connect(ui->checkBoxCoinControlChange, &QCheckBox::stateChanged, this, &SendCoinsDialog::coinControlChangeChecked);
     connect(ui->lineEditCoinControlChange, &QValidatedLineEdit::textEdited, this, &SendCoinsDialog::coinControlChangeEdited);
 
+    connect(ui->checkUseDarksend, SIGNAL(stateChanged(int)), this, SLOT(updateDisplayUnit()));
+    connect(ui->checkInstanTX, SIGNAL(stateChanged(int)), this, SLOT(updateInstanTX()));
+
     // Coin Control: clipboard actions
     QAction *clipboardQuantityAction = new QAction(tr("Copy quantity"), this);
     QAction *clipboardAmountAction = new QAction(tr("Copy amount"), this);
@@ -215,6 +218,7 @@ SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *p
     ui->labelCoinControlBytes->addAction(clipboardBytesAction);
     ui->labelCoinControlLowOutput->addAction(clipboardLowOutputAction);
     ui->labelCoinControlChange->addAction(clipboardChangeAction);
+    ui->checkUseDarksend->setVisible(false);
 
     // init transaction fee section
     QSettings settings;
@@ -380,16 +384,43 @@ void SendCoinsDialog::on_sendButton_clicked()
 
         CAmount txFee = currentTransaction.getTransactionFee();
 
+    QString strFunds = tr("using") + " <b>" + tr("anonymous funds") + "</b>";
+    QString strFee = "";
+    recipients[0].inputType = ONLY_DENOMINATED;
+
+    /*if (ui->checkUseDarksend->isChecked()) {
+        recipients[0].inputType = ONLY_DENOMINATED;
+        strFunds = tr("using") + " <b>" + tr("anonymous funds") + "</b>";
+        QString strNearestAmount(
+                BitcoinUnits::formatWithUnit(
+                        model->getOptionsModel()->getDisplayUnit(), 0.1 * COIN));
+        strFee = QString(tr(
+                "(darksend requires this amount to be rounded up to the nearest %1).")
+                                 .arg(strNearestAmount));
+    } else {*/
+        recipients[0].inputType = ALL_COINS;
+        strFunds = tr("using") + " <b>" + tr("any available funds (not recommended)") + "</b>";
+    //}
+
+
+    if (ui->checkInstanTX->isChecked()) {
+        recipients[0].useInstanTX = true;
+        strFunds += " ";
+        strFunds += tr("and InstanTX");
+    } else {
+        recipients[0].useInstanTX = false;
+    }
+
         // Format confirmation message
         QStringList formatted;
         for (const SendCoinsRecipient &rcp : currentTransaction.getRecipients()) {
             // generate bold amount string with wallet name in case of multiwallet
             QString amount =
                     "<b>" + BitcoinUnits::formatHtmlWithUnit(model->getOptionsModel()->getDisplayUnit(), rcp.amount);
+            amount.append("</b> ").append(strFunds);
             if (model->isMultiwallet()) {
                 amount.append(" <u>" + tr("from wallet %1").arg(GUIUtil::HtmlEscape(model->getWalletName())) + "</u> ");
             }
-            amount.append("</b>");
             // generate monospace address string
             QString address = "<span style='font-family: monospace;'>" + rcp.address;
             address.append("</span>");
@@ -1037,9 +1068,20 @@ void SendCoinsDialog::setBalance(const interfaces::WalletBalances& balances)
 
 void SendCoinsDialog::updateDisplayUnit()
 {
+    CCoinControl coinControl;
+    coinControl.useDarksend = ui->checkUseDarksend->isChecked();
     setBalance(model->wallet().getBalances());
     ui->customFee->setDisplayUnit(model->getOptionsModel()->getDisplayUnit());
     updateSmartFeeLabel();
+}
+
+void SendCoinsDialog::updateInstanTX()
+{
+    QSettings settings;
+    CCoinControl coinControl;
+    settings.setValue("bUseInstanTX", ui->checkInstanTX->isChecked());
+    coinControl.useInstanTX = ui->checkInstanTX->isChecked();
+    coinControlUpdateLabels();
 }
 
 void SendCoinsDialog::processSendCoinsReturn(const WalletModel::SendCoinsReturn &sendCoinsReturn, const QString &msgArg)

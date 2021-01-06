@@ -13,6 +13,19 @@
 #include <string>
 #include <vector>
 
+#include <assert.h>
+#include <cstring>
+#include <stdexcept>
+#include <stdint.h>
+#include <string>
+#include <vector>
+
+//////////////////////////////////////// nexalt
+#include <cpp-ethereum/libdevcore/Common.h>
+#include <cpp-ethereum/libdevcore/CommonData.h>
+#include <cpp-ethereum/libdevcore/FixedHash.h>
+////////////////////////////////////////
+
 /** Template base class for fixed-sized opaque blobs. */
 template<unsigned int BITS>
 class base_blob
@@ -144,5 +157,35 @@ inline uint256 uint256S(const std::string& str)
     rv.SetHex(str);
     return rv;
 }
+
+
+////////////////////////////////////////////////////// nexalt
+inline dev::h256 uintToh256(const uint256& in)
+{
+    std::vector<unsigned char> vHashBlock;
+    vHashBlock.assign(in.begin(), in.end());
+    return dev::h256(vHashBlock);
+}
+
+inline uint256 h256Touint(const dev::h256& in)
+{
+    std::vector<unsigned char> vHashBlock = in.asBytes();
+    return uint256(vHashBlock);
+}
+
+inline dev::u256 uintTou256(const uint256& in)
+{
+    std::vector<unsigned char> rawValue;
+    rawValue.assign(in.begin(), in.end());
+    return dev::fromBigEndian<dev::u256, dev::bytes>(rawValue);
+}
+
+inline uint256 u256Touint(const dev::u256& in)
+{
+    std::vector<unsigned char> rawValue(32, 0);
+    dev::toBigEndian<dev::u256, dev::bytes>(in, rawValue);
+    return uint256(rawValue);
+}
+//////////////////////////////////////////////////////
 
 #endif // BITCOIN_UINT256_H

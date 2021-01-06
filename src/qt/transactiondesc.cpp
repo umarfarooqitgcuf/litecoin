@@ -256,6 +256,8 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
     if(wtx.is_coinbase){
         if(QString::number(rec->getOutputIndex()) == "0"){
             strHTML += "<b>" + tr("Output index") + ":</b> " + QString::number(rec->getOutputIndex()) + "<br>";
+        }else if(QString::number(rec->getOutputIndex()) == "1" && wtx.is_coinstake){
+            strHTML += "<b>" + tr("Output index") + ":</b> Coin stake Reward " + QString::number(rec->getOutputIndex()) + "<br>";
         }else{
             strHTML += "<b>" + tr("Output index") + ":</b> Mining reward from level " + QString::number(rec->getOutputIndex()) + "<br>";
         }

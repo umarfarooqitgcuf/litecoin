@@ -344,6 +344,15 @@ SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nI
 
     return data;
 }
+void UpdateTransaction(CMutableTransaction& tx, unsigned int nIn, const SignatureData& data)
+{
+    assert(tx.vin.size() > nIn);
+    tx.vin[nIn].scriptSig = data.scriptSig;
+    /*if (!data.scriptWitness.IsNull() || tx.wit.vtxinwit.size() > nIn) {
+        tx.wit.vtxinwit.resize(tx.vin.size());
+        tx.wit.vtxinwit[nIn].scriptWitness = data.scriptWitness;
+    }*/
+}
 
 void UpdateInput(CTxIn& input, const SignatureData& data)
 {
@@ -380,6 +389,15 @@ bool SignSignature(const SigningProvider &provider, const CScript& fromPubKey, C
 }
 
 bool SignSignature(const SigningProvider &provider, const CTransaction& txFrom, CMutableTransaction& txTo, unsigned int nIn, int nHashType)
+{
+    assert(nIn < txTo.vin.size());
+    CTxIn& txin = txTo.vin[nIn];
+    assert(txin.prevout.n < txFrom.vout.size());
+    const CTxOut& txout = txFrom.vout[txin.prevout.n];
+
+    return SignSignature(provider, txout.scriptPubKey, txTo, nIn, txout.nValue, nHashType);
+}
+bool SignSignatureStack(const SigningProvider &provider, const CTransaction& txFrom, CMutableTransaction& txTo, unsigned int nIn, int nHashType)
 {
     assert(nIn < txTo.vin.size());
     CTxIn& txin = txTo.vin[nIn];

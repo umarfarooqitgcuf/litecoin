@@ -44,6 +44,7 @@
 #include <memory>
 #include <mutex>
 #include <condition_variable>
+#include "../pow.h"
 
 struct CUpdatedBlock
 {
@@ -59,7 +60,14 @@ static CUpdatedBlock latestblock;
  */
 double GetDifficulty(const CBlockIndex* blockindex)
 {
-    assert(blockindex);
+    /*if (blockindex == NULL) {
+        if (chainActive.Tip() == NULL)
+            return 1.0;
+        else
+            blockindex = chainActive.Tip();
+    }
+
+    //assert(blockindex);
 
     int nShift = (blockindex->nBits >> 24) & 0xff;
     double dDiff =
@@ -72,6 +80,31 @@ double GetDifficulty(const CBlockIndex* blockindex)
     }
     while (nShift > 29)
     {
+        dDiff /= 256.0;
+        nShift--;
+    }
+
+    return dDiff;*/
+
+    // Floating point number that is a multiple of the minimum difficulty,
+    // minimum difficulty = 1.0.
+    if (blockindex == NULL) {
+        if (chainActive.Tip() == NULL)
+            return 1.0;
+        else
+            blockindex = chainActive.Tip();
+    }
+
+    int nShift = (blockindex->nBits >> 24) & 0xff;
+
+    double dDiff =
+            (double)0x0000ffff / (double)(blockindex->nBits & 0x00ffffff);
+
+    while (nShift < 29) {
+        dDiff *= 256.0;
+        nShift++;
+    }
+    while (nShift > 29) {
         dDiff /= 256.0;
         nShift--;
     }
@@ -104,7 +137,8 @@ UniValue blockheaderToJSON(const CBlockIndex* tip, const CBlockIndex* blockindex
     result.pushKV("mediantime", (int64_t)blockindex->GetMedianTimePast());
     result.pushKV("nonce", (uint64_t)blockindex->nNonce);
     result.pushKV("bits", strprintf("%08x", blockindex->nBits));
-    result.pushKV("difficulty", GetDifficulty(blockindex));
+    result.pushKV("difficulty_pow", GetDifficulty(GetLastBlockIndex(blockindex, false)));
+    result.pushKV("difficulty_pos", GetDifficulty(GetLastBlockIndex(blockindex, true)));
     result.pushKV("chainwork", blockindex->nChainWork.GetHex());
     result.pushKV("nTx", (uint64_t)blockindex->nTx);
 
@@ -146,7 +180,8 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* tip, const CBlockIn
     result.pushKV("mediantime", (int64_t)blockindex->GetMedianTimePast());
     result.pushKV("nonce", (uint64_t)block.nNonce);
     result.pushKV("bits", strprintf("%08x", block.nBits));
-    result.pushKV("difficulty", GetDifficulty(blockindex));
+    result.pushKV("difficulty_pow", GetDifficulty(GetLastBlockIndex(blockindex, false)));
+    result.pushKV("difficulty_pos", GetDifficulty(GetLastBlockIndex(blockindex, true)));
     result.pushKV("chainwork", blockindex->nChainWork.GetHex());
     result.pushKV("nTx", (uint64_t)blockindex->nTx);
 
@@ -373,7 +408,11 @@ static UniValue getdifficulty(const JSONRPCRequest& request)
             }.ToString());
 
     LOCK(cs_main);
-    return GetDifficulty(chainActive.Tip());
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("proof-of-work", GetDifficulty(GetLastBlockIndex(pindexBestHeader, false)));
+    obj.pushKV("proof-of-stake", GetDifficulty(GetLastBlockIndex(pindexBestHeader, true)));
+    return obj;
+    //return GetDifficulty(chainActive.Tip());
 }
 
 static std::string EntryDescriptionString()
@@ -1329,7 +1368,8 @@ UniValue getblockchaininfo(const JSONRPCRequest& request)
     obj.pushKV("blocks",                (int)chainActive.Height());
     obj.pushKV("headers",               pindexBestHeader ? pindexBestHeader->nHeight : -1);
     obj.pushKV("bestblockhash",         tip->GetBlockHash().GetHex());
-    obj.pushKV("difficulty",            (double)GetDifficulty(tip));
+    obj.pushKV("difficulty_pow",            (double)GetDifficulty(GetLastBlockIndex(tip, false)));
+    obj.pushKV("difficulty_pos",            (double)GetDifficulty(GetLastBlockIndex(tip, true)));
     obj.pushKV("mediantime",            (int64_t)tip->GetMedianTimePast());
     obj.pushKV("verificationprogress",  GuessVerificationProgress(Params().TxData(), tip));
     obj.pushKV("initialblockdownload",  IsInitialBlockDownload());

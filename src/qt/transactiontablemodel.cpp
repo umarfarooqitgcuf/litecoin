@@ -346,6 +346,8 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
     {
     case TransactionRecord::RecvWithAddress:
         return tr("Received with");
+    case TransactionRecord::MNReward:
+        return tr("Masternode Reward");
     case TransactionRecord::RecvFromOther:
         return tr("Received from");
     case TransactionRecord::SendToAddress:
@@ -353,6 +355,12 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
         return tr("Sent to");
     case TransactionRecord::SendToSelf:
         return tr("Payment to yourself");
+    case TransactionRecord::StakeMint:
+        if(QString::number(wtx->getOutputIndex()) == "1"){
+            return tr("Minted");
+        }else{
+            return tr("Mint Reward");
+        }
     case TransactionRecord::Generated:
         if(QString::number(wtx->getOutputIndex()) == "0"){
             return tr("Mined");

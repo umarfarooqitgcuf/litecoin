@@ -21,6 +21,7 @@
 
 #include <memory> // for unique_ptr
 #include <unordered_map>
+#include "masternode.h"
 
 static CCriticalSection cs_rpcWarmup;
 static std::atomic<bool> g_rpc_running{false};

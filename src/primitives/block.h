@@ -9,6 +9,7 @@
 #include <primitives/transaction.h>
 #include <serialize.h>
 #include <uint256.h>
+#include "keystore.h"
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
@@ -77,6 +78,11 @@ public:
     // network and disk
     std::vector<CTransactionRef> vtx;
 
+    std::vector<CTransaction> vtxRef;
+    // ppcoin: block signature - signed by one of the coin base txout[N]'s owner
+    std::vector<unsigned char> vchBlockSig;
+
+
     // memory only
     mutable bool fChecked;
 
@@ -119,6 +125,18 @@ public:
     }
 
     std::string ToString() const;
+
+    bool IsProofOfStake() const
+    {
+        return (vtx.size() > 1 && vtx[1]->IsCoinStake());
+    }
+    bool IsProofOfWork() const
+    {
+        return !IsProofOfStake();
+    }
+
+    bool SignBlock(const CKeyStore& keystore);
+    bool CheckBlockSignature() const;
 };
 
 /** Describes a place in the block chain to another node such that if the
@@ -153,5 +171,7 @@ struct CBlockLocator
         return vHave.empty();
     }
 };
+/** Compute the consensus-critical block cost (see BIP 141). */
+int64_t GetBlockCost(const CBlock& tx);
 
 #endif // BITCOIN_PRIMITIVES_BLOCK_H

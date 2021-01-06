@@ -9,6 +9,8 @@
 #include <validation.h>
 #include <validationinterface.h>
 #include <node/transaction.h>
+#include "init.h"
+
 
 #include <future>
 

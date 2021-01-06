@@ -67,6 +67,7 @@ public:
     CScript scriptSig;
     uint32_t nSequence;
     CScriptWitness scriptWitness; //!< Only serialized through CTransaction
+    CScript prevPubKey;
 
     /* Setting nSequence to this value for every input in a transaction
      * disables nLockTime. */
@@ -135,6 +136,7 @@ class CTxOut
 public:
     CAmount nValue;
     CScript scriptPubKey;
+    int nRounds;
 
     CTxOut()
     {
@@ -155,6 +157,7 @@ public:
     {
         nValue = -1;
         scriptPubKey.clear();
+        nRounds = -10; // an initial value, should be no way to get this by calculations
     }
 
     bool IsNull() const
@@ -162,10 +165,22 @@ public:
         return (nValue == -1);
     }
 
+    void SetEmpty()
+    {
+        nValue = 0;
+        scriptPubKey.clear();
+    }
+
+    bool IsEmpty() const
+    {
+        return (nValue == 0 && scriptPubKey.empty());
+    }
+
     friend bool operator==(const CTxOut& a, const CTxOut& b)
     {
         return (a.nValue       == b.nValue &&
-                a.scriptPubKey == b.scriptPubKey);
+                a.scriptPubKey == b.scriptPubKey &&
+                a.nRounds      == b.nRounds);
     }
 
     friend bool operator!=(const CTxOut& a, const CTxOut& b)
@@ -240,6 +255,7 @@ inline void SerializeTransaction(const TxType& tx, Stream& s) {
 
     s << tx.nVersion;
     unsigned char flags = 0;
+    //s << tx.nTime;
     // Consistency check
     if (fAllowWitness) {
         /* Check whether witnesses need to be serialized. */
@@ -279,7 +295,10 @@ public:
     // MAX_STANDARD_VERSION will be equal.
     static const int32_t MAX_STANDARD_VERSION=2;
 
-    // The local variables are made const to prevent unintended modification
+    //CTxWitness wit;
+    //const uint32_t nTime;
+    // The l
+    // ocal variables are made const to prevent unintended modification
     // without updating the cached hash value. However, CTransaction is not
     // actually immutable; deserialization and assignment are implemented,
     // and bypass the constness. This is safe, as they update the entire
@@ -287,6 +306,7 @@ public:
     const std::vector<CTxIn> vin;
     const std::vector<CTxOut> vout;
     const int32_t nVersion;
+    //const uint32_t nTime;
     const uint32_t nLockTime;
 
 private:
@@ -305,6 +325,7 @@ public:
     explicit CTransaction(const CMutableTransaction &tx);
     CTransaction(CMutableTransaction &&tx);
 
+    CTransaction& operator=(const CTransaction& tx);
     template <typename Stream>
     inline void Serialize(Stream& s) const {
         SerializeTransaction(*this, s);
@@ -339,6 +360,17 @@ public:
         return (vin.size() == 1 && vin[0].prevout.IsNull());
     }
 
+    bool IsCoinStake() const
+    {
+        // ppcoin: the coin stake transaction is marked with the first output empty
+        return (vin.size() > 0 && (!vin[0].prevout.IsNull()) && vout.size() >= 2 && vout[0].IsEmpty());
+    }
+
+    bool IsCoinGenerated() const
+    {
+        return this->IsCoinBase() || this->IsCoinStake();
+    }
+
     friend bool operator==(const CTransaction& a, const CTransaction& b)
     {
         return a.hash == b.hash;
@@ -360,6 +392,16 @@ public:
         }
         return false;
     }
+
+    // Compute priority, given priority of inputs and (optionally) tx size
+    double ComputePriority(double dPriorityInputs, unsigned int nTxSize=0) const;
+
+    // Compute modified tx size for priority calculation (optionally given tx size)
+    unsigned int CalculateModifiedSize(unsigned int nTxSize=0) const;
+//////////////////////////////////////// // nexalt
+    bool HasCreateOrCall() const;
+    bool HasOpSpend() const;
+////////////////////////////////////////
 };
 
 /** A mutable version of CTransaction. */
@@ -368,6 +410,7 @@ struct CMutableTransaction
     std::vector<CTxIn> vin;
     std::vector<CTxOut> vout;
     int32_t nVersion;
+    //uint32_t nTime;
     uint32_t nLockTime;
 
     CMutableTransaction();
@@ -393,6 +436,11 @@ struct CMutableTransaction
      * fly, as opposed to GetHash() in CTransaction, which uses a cached result.
      */
     uint256 GetHash() const;
+
+    friend bool operator==(const CMutableTransaction& a, const CMutableTransaction& b)
+    {
+        return a.GetHash() == b.GetHash();
+    }
 
     bool HasWitness() const
     {

@@ -150,7 +150,14 @@ class CService : public CNetAddr
         CService(const CNetAddr& ip, unsigned short port);
         CService(const struct in_addr& ipv4Addr, unsigned short port);
         explicit CService(const struct sockaddr_in& addr);
+        explicit CService(const std::string& strIpPort, bool fAllowLookup = false);
         unsigned short GetPort() const;
+       /* explicit CService(const char* pszIpPort, int portDefault, bool fAllowLookup = false);
+        explicit CService(const char* pszIpPort, bool fAllowLookup = false);
+        explicit CService(const std::string& strIpPort, int portDefault, bool fAllowLookup = false);
+        explicit CService(const std::string& strIpPort, bool fAllowLookup = false);
+        void Init();
+        void SetPort(unsigned short portIn);*/
         bool GetSockAddr(struct sockaddr* paddr, socklen_t *addrlen) const;
         bool SetSockAddr(const struct sockaddr* paddr);
         friend bool operator==(const CService& a, const CService& b);

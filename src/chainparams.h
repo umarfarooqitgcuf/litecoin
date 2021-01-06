@@ -19,6 +19,7 @@ struct SeedSpec6 {
     uint16_t port;
 };
 
+static const int64_t STATIC_POS_REWARD = 60 * COIN;
 typedef std::map<int, uint256> MapCheckpoints;
 
 struct CCheckpointData {
@@ -58,10 +59,11 @@ public:
         MAX_BASE58_TYPES
     };
 
+    const uint256& HashGenesisBlock() const { return consensus.hashGenesisBlock; }
     const Consensus::Params& GetConsensus() const { return consensus; }
     const CMessageHeader::MessageStartChars& MessageStart() const { return pchMessageStart; }
     int GetDefaultPort() const { return nDefaultPort; }
-
+    const uint256& ProofOfWorkLimit() const { return consensus.powLimit; }
     const CBlock& GenesisBlock() const { return genesis; }
     /** Default value for -checkmempool and -checkblockindex argument */
     bool DefaultConsistencyChecks() const { return fDefaultConsistencyChecks; }
@@ -78,6 +80,9 @@ public:
     std::string NetworkIDString() const { return strNetworkID; }
     /** Return true if the fallback fee is by default enabled for this network */
     bool IsFallbackFeeEnabled() const { return m_fallback_fee_enabled; }
+    /** The masternode count that we will allow the see-saw reward payments to be off by */
+    int MasternodeCountDrift() const { return nMasternodeCountDrift; }
+    int MaxReorganizationDepth() const { return nMaxReorganizationDepth; }
     /** Return the list of hostnames to look up for DNS seeds */
     const std::vector<std::string>& DNSSeeds() const { return vSeeds; }
     const std::vector<unsigned char>& Base58Prefix(Base58Type type) const { return base58Prefixes[type]; }
@@ -85,6 +90,14 @@ public:
     const std::vector<SeedSpec6>& FixedSeeds() const { return vFixedSeeds; }
     const CCheckpointData& Checkpoints() const { return checkpointData; }
     const ChainTxData& TxData() const { return chainTxData; }
+    /** Devfee vars */
+    int StartDevfeeBlock() const { return nStartDevfeeBlock; }
+    int COINBASE_MATURITY() const { return nMaturity; }
+    int64_t StakingRoundPeriod() const { return nStakingRoundPeriod; }
+    int64_t StakingInterval() const { return nStakingInterval; }
+    int64_t StakingMinAge() const { return nStakingMinAge; }
+    int FirstSCBlock() const { return nFirstSCBlock; }
+
 protected:
     CChainParams() {}
 
@@ -106,6 +119,14 @@ protected:
     CCheckpointData checkpointData;
     ChainTxData chainTxData;
     bool m_fallback_fee_enabled;
+    int nMasternodeCountDrift;
+    int nMaxReorganizationDepth;
+    int nStartDevfeeBlock;
+    int nMaturity;
+    int64_t nStakingRoundPeriod;
+    int64_t nStakingInterval;
+    int64_t nStakingMinAge;
+    int nFirstSCBlock;
 };
 
 /**
@@ -126,5 +147,7 @@ const CChainParams &Params();
  * @throws std::runtime_error when the chain is not supported.
  */
 void SelectParams(const std::string& chain);
+CAmount GetProofOfStakeReward(int64_t nFees, int nHeight);
+
 
 #endif // BITCOIN_CHAINPARAMS_H

@@ -19,6 +19,7 @@
 #include <QIcon>
 #include <QMenu>
 #include <QMessageBox>
+#include <QApplication>
 #include <QSortFilterProxyModel>
 
 class AddressBookSortFilterProxyModel final : public QSortFilterProxyModel

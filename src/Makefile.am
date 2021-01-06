@@ -128,13 +128,17 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  darksend.h \
   fs.h \
   httprpc.h \
   httpserver.h \
+  #luxcontrol.h \
   index/base.h \
   index/txindex.h \
   indirectmap.h \
   init.h \
+  activemasternode.h \
+  instantx.h \
   interfaces/chain.h \
   interfaces/handler.h \
   interfaces/node.h \
@@ -147,6 +151,8 @@ BITCOIN_CORE_H = \
   logging.h \
   memusage.h \
   merkleblock.h \
+  masternode.h \
+  masternodeconfig.h \
   miner.h \
   net.h \
   net_processing.h \
@@ -175,6 +181,7 @@ BITCOIN_CORE_H = \
   rpc/rawtransaction.h \
   rpc/register.h \
   rpc/util.h \
+  spork.h \
   scheduler.h \
   script/descriptor.h \
   script/ismine.h \
@@ -183,6 +190,7 @@ BITCOIN_CORE_H = \
   script/standard.h \
   shutdown.h \
   streams.h \
+  stake.h \
   support/allocators/secure.h \
   support/allocators/zeroafterfree.h \
   support/cleanse.h \
@@ -225,8 +233,132 @@ BITCOIN_CORE_H = \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
   zmq/zmqpublishnotifier.h \
-  zmq/zmqrpc.h
-
+  zmq/zmqrpc.h \
+  lux/luxstate.h \
+  lux/luxtransaction.h \
+  lux/luxDGP.h \
+  lux/storageresults.h \
+  cpp-ethereum/libdevcore/CommonData.h \
+  cpp-ethereum/libdevcore/Base64.h \
+  cpp-ethereum/libdevcore/Common.h \
+  cpp-ethereum/libdevcore/CommonIO.h \
+  cpp-ethereum/libdevcore/CommonJS.h \
+  cpp-ethereum/libdevcore/FileSystem.h \
+  cpp-ethereum/libdevcore/FixedHash.h \
+  cpp-ethereum/libdevcore/Guards.h \
+  cpp-ethereum/libdevcore/Hash.h \
+  cpp-ethereum/libdevcore/Log.h \
+  cpp-ethereum/libdevcore/MemoryDB.h \
+  cpp-ethereum/libdevcore/OverlayDB.h \
+  cpp-ethereum/libdevcore/RLP.h \
+  cpp-ethereum/libdevcore/SHA3.h \
+  cpp-ethereum/libdevcore/TransientDirectory.h \
+  cpp-ethereum/libdevcore/TrieCommon.h \
+  cpp-ethereum/libdevcore/Worker.h \
+  cpp-ethereum/libevm/ExtVMFace.h \
+  cpp-ethereum/libevm/VM.h \
+  cpp-ethereum/libevm/VMFactory.h \
+  cpp-ethereum/libevmcore/Instruction.h \
+  cpp-ethereum/libevmcore/Exceptions.h \
+  cpp-ethereum/libevmcore/EVMSchedule.h \
+  cpp-ethereum/libethereum/Account.h \
+  cpp-ethereum/libethereum/Defaults.h \
+  cpp-ethereum/libethereum/GasPricer.h \
+  cpp-ethereum/libethereum/State.h \
+  cpp-ethereum/libethcore/ABI.h \
+  cpp-ethereum/libethcore/ChainOperationParams.h \
+  cpp-ethereum/libethcore/Common.h \
+  cpp-ethereum/libethcore/ICAP.h \
+  cpp-ethereum/libethcore/Precompiled.h \
+  cpp-ethereum/libdevcore/TrieDB.h \
+  cpp-ethereum/libdevcrypto/Common.h \
+  cpp-ethereum/libdevcrypto/CryptoPP.h \
+  cpp-ethereum/libdevcrypto/AES.h \
+  cpp-ethereum/libdevcrypto/ECDHE.h \
+  cpp-ethereum/libethashseal/GenesisInfo.h \
+  cpp-ethereum/libethereum/ChainParams.h \
+  cpp-ethereum/libethcore/Transaction.h \
+  cpp-ethereum/libethcore/Exceptions.h \
+  cpp-ethereum/libethereum/Transaction.h \
+  cpp-ethereum/libethereum/Executive.h \
+  cpp-ethereum/libethereum/ExtVM.h \
+  cpp-ethereum/libethereum/Block.h \
+  cpp-ethereum/libethereum/BlockChain.h \
+  cpp-ethereum/libethereum/BlockDetails.h \
+  cpp-ethereum/libethereum/TransactionQueue.h \
+  cpp-ethereum/libethereum/BlockQueue.h \
+  cpp-ethereum/libethcore/BlockHeader.h \
+  cpp-ethereum/libethereum/TransactionReceipt.h \
+  cpp-ethereum/libethcore/SealEngine.h \
+  cpp-ethereum/libdevcore/TrieHash.h \
+  cpp-ethereum/libethereum/GenesisInfo.h \
+  cpp-ethereum/libethashseal/Ethash.h \
+  cpp-ethereum/libethashseal/EthashCPUMiner.h \
+  cpp-ethereum/libethashseal/EthashAux.h \
+  cpp-ethereum/libethashseal/EthashProofOfWork.h \
+  cpp-ethereum/libethash/internal.h \
+  cpp-ethereum/libethash/io.h \
+  cpp-ethereum/libethash/sha3.h \
+  cpp-ethereum/libdevcore/vector_ref.h \
+  cpp-ethereum/libdevcore/Exceptions.h \
+  cpp-ethereum/libdevcore/db.h \
+  cpp-ethereum/libdevcore/concurrent_queue.h \
+  cpp-ethereum/libdevcore/Terminal.h \
+  cpp-ethereum/libethereum/CodeSizeCache.h \
+  cpp-ethereum/libethereum/VerifiedBlock.h \
+  cpp-ethereum/libdevcore/Assertions.h \
+  cpp-ethereum/libdevcore/debugbreak.h \
+  cpp-ethereum/libethereum/GenericMiner.h \
+  cpp-ethereum/libevm/VMFace.h \
+  cpp-ethereum/libethereum/GenericFarm.h \
+  cpp-ethereum/libethereum/Interface.h \
+  cpp-ethereum/libethcore/CommonJS.h \
+  cpp-ethereum/libdevcore/picosha2.h \
+  cpp-ethereum/libevm/VMConfig.h \
+  cpp-ethereum/libethereum/LogFilter.h \
+  cpp-ethereum/libdevcrypto/Exceptions.h \
+  cpp-ethereum/libethash/ethash.h \
+  cpp-ethereum/libethash/compiler.h \
+  cpp-ethereum/libethash/data_sizes.h \
+  cpp-ethereum/libethash/fnv.h \
+  cpp-ethereum/libethash/mmap.h \
+  cpp-ethereum/libethash/endian.h \
+  cpp-ethereum/libethash/io.h \
+  cpp-ethereum/libethash/ethash.h \
+  cpp-ethereum/libethash/internal.h \
+  cpp-ethereum/utils/json_spirit/JsonSpiritHeaders.h \
+  cpp-ethereum/utils/json_spirit/json_spirit.h \
+  cpp-ethereum/utils/json_spirit/json_spirit_error_position.h \
+  cpp-ethereum/utils/json_spirit/json_spirit_reader.h \
+  cpp-ethereum/utils/json_spirit/json_spirit_reader_template.h \
+  cpp-ethereum/utils/json_spirit/json_spirit_stream_reader.h \
+  cpp-ethereum/utils/json_spirit/json_spirit_utils.h \
+  cpp-ethereum/utils/json_spirit/json_spirit_writer.h \
+  cpp-ethereum/utils/json_spirit/json_spirit_writer_template.h \
+  json/allocator.h \
+  json/assertions.h \
+  json/autolink.h \
+  json/config.h \
+  json/features.h \
+  json/forwards.h \
+  json/json.h \
+  json/json_spirit.h \
+  json/json_spirit_error_position.h \
+  json/json_spirit_reader.h \
+  json/json_spirit_reader_template.h \
+  json/json_spirit_stream_reader.h \
+  json/json_spirit_utils.h \
+  json/json_spirit_value.h \
+  json/json_spirit_writer.h \
+  json/json_spirit_writer_template.h \
+  json/reader.h \
+  json/value.h \
+  json/version.h \
+  cryptopp/hmac.h \
+  cryptopp/iterhash.h \
+  cryptopp/whrlpool.h \
+  cryptopp/cryptlib.h \
+  json/writer.h
 
 obj/build.h: FORCE
 	@$(MKDIR_P) $(builddir)/obj
@@ -249,14 +381,20 @@ libbitcoin_server_a_SOURCES = \
   consensus/tx_verify.cpp \
   httprpc.cpp \
   httpserver.cpp \
+  #luxcontrol.cpp \
   index/base.cpp \
   index/txindex.cpp \
   interfaces/chain.cpp \
   interfaces/handler.cpp \
   interfaces/node.cpp \
   init.cpp \
+  activemasternode.cpp \
+  darksend.cpp \
+  instantx.cpp \
   dbwrapper.cpp \
   merkleblock.cpp \
+  masternode.cpp \
+  masternodeconfig.cpp \
   miner.cpp \
   net.cpp \
   net_processing.cpp \
@@ -268,6 +406,7 @@ libbitcoin_server_a_SOURCES = \
   policy/rbf.cpp \
   pow.cpp \
   rest.cpp \
+  rpcdarksend.cpp \
   rpc/blockchain.cpp \
   rpc/mining.cpp \
   rpc/misc.cpp \
@@ -275,6 +414,8 @@ libbitcoin_server_a_SOURCES = \
   rpc/rawtransaction.cpp \
   rpc/server.cpp \
   rpc/util.cpp \
+  spork.cpp \
+  stake.cpp \
   script/sigcache.cpp \
   shutdown.cpp \
   timedata.cpp \
@@ -285,6 +426,227 @@ libbitcoin_server_a_SOURCES = \
   validation.cpp \
   validationinterface.cpp \
   versionbits.cpp \
+  cpp-ethereum/libdevcore/Base64.cpp \
+  cpp-ethereum/libdevcore/Common.cpp \
+  cpp-ethereum/libdevcore/CommonData.cpp \
+  cpp-ethereum/libdevcore/CommonIO.cpp \
+  cpp-ethereum/libdevcore/CommonJS.cpp \
+  cpp-ethereum/libethcore/CommonJS.cpp \
+  cpp-ethereum/libdevcore/FileSystem.cpp \
+  cpp-ethereum/libdevcore/FixedHash.cpp \
+  cpp-ethereum/libdevcore/Guards.cpp \
+  cpp-ethereum/libdevcore/Hash.cpp \
+  cpp-ethereum/libdevcore/Log.cpp \
+  cpp-ethereum/libdevcore/MemoryDB.cpp \
+  cpp-ethereum/libdevcore/OverlayDB.cpp \
+  cpp-ethereum/libdevcore/RLP.cpp \
+  cpp-ethereum/libdevcore/SHA3.cpp \
+  cpp-ethereum/libdevcore/TransientDirectory.cpp \
+  cpp-ethereum/libdevcore/TrieCommon.cpp \
+  cpp-ethereum/libdevcore/Worker.cpp \
+  cpp-ethereum/libevm/ExtVMFace.cpp \
+  cpp-ethereum/libevm/VM.cpp \
+  cpp-ethereum/libevm/VMOpt.cpp \
+  cpp-ethereum/libevm/VMCalls.cpp \
+  cpp-ethereum/libevm/VMFactory.cpp \
+  cpp-ethereum/libevmcore/Instruction.cpp \
+  cpp-ethereum/libethereum/Account.cpp \
+  cpp-ethereum/libethereum/Defaults.cpp \
+  cpp-ethereum/libethereum/GasPricer.cpp \
+  cpp-ethereum/libethereum/State.cpp \
+  cpp-ethereum/libethcore/ABI.cpp \
+  cpp-ethereum/libethcore/ChainOperationParams.cpp \
+  cpp-ethereum/libethcore/Common.cpp \
+  cpp-ethereum/libethcore/ICAP.cpp \
+  cpp-ethereum/libethcore/Precompiled.cpp \
+  cpp-ethereum/libdevcore/TrieDB.cpp \
+  cpp-ethereum/libdevcrypto/Common.cpp \
+  cpp-ethereum/libdevcrypto/CryptoPP.cpp \
+  cpp-ethereum/libdevcrypto/AES.cpp \
+  cpp-ethereum/libdevcrypto/ECDHE.cpp \
+  cpp-ethereum/libethashseal/GenesisInfo.cpp \
+  cpp-ethereum/libethereum/ChainParams.cpp \
+  cpp-ethereum/libethcore/Transaction.cpp \
+  cpp-ethereum/libethereum/Transaction.cpp \
+  cpp-ethereum/libethereum/Executive.cpp \
+  cpp-ethereum/libethereum/ExtVM.cpp \
+  cpp-ethereum/libethereum/Block.cpp \
+  cpp-ethereum/libethereum/BlockChain.cpp \
+  cpp-ethereum/libethereum/BlockDetails.cpp \
+  cpp-ethereum/libethereum/TransactionQueue.cpp \
+  cpp-ethereum/libethereum/BlockQueue.cpp \
+  cpp-ethereum/libethcore/BlockHeader.cpp \
+  cpp-ethereum/libethereum/TransactionReceipt.cpp \
+  cpp-ethereum/libdevcore/TrieHash.cpp \
+  cpp-ethereum/libethereum/GenesisInfo.cpp \
+  cpp-ethereum/libethashseal/Ethash.cpp \
+  cpp-ethereum/libethashseal/EthashCPUMiner.cpp \
+  cpp-ethereum/libethashseal/EthashAux.cpp \
+  cpp-ethereum/libethashseal/EthashProofOfWork.cpp \
+  cpp-ethereum/libethash/internal.c \
+  cpp-ethereum/libethash/io.c \
+  cpp-ethereum/libethash/sha3.c \
+  cpp-ethereum/libethashseal/genesis/mainNetwork.cpp \
+  cpp-ethereum/libethashseal/genesis/eip150Test.cpp \
+  cpp-ethereum/libethashseal/genesis/eip158Test.cpp \
+  cpp-ethereum/libethashseal/genesis/frontierTest.cpp \
+  cpp-ethereum/libethashseal/genesis/homesteadTest.cpp \
+  cpp-ethereum/libethashseal/genesis/mainNetworkTest.cpp \
+  cpp-ethereum/libethashseal/genesis/metropolisTest.cpp \
+  cpp-ethereum/libethashseal/genesis/luxMainNetwork.cpp \
+  cpp-ethereum/libethashseal/genesis/luxTestNetwork.cpp \
+  cpp-ethereum/libethashseal/genesis/ropsten.cpp \
+  cpp-ethereum/libethashseal/genesis/transitionnetTest.cpp \
+  json/json_spirit_reader.cpp \
+  json/json_spirit_value.cpp \
+  json/json_spirit_writer.cpp \
+  cpp-ethereum/libethcore/SealEngine.cpp \
+  cpp-ethereum/utils/json_spirit/json_spirit_reader.cpp \
+  cpp-ethereum/utils/json_spirit/json_spirit_writer.cpp \
+  cryptopp/hmac.cpp \
+  cryptopp/iterhash.cpp \
+  cryptopp/misc.cpp \
+  cryptopp/cryptlib.cpp \
+  cryptopp/3way.cpp \
+  cryptopp/adler32.cpp \
+  cryptopp/algebra.cpp \
+  cryptopp/algparam.cpp \
+  cryptopp/arc4.cpp \
+  cryptopp/asn.cpp \
+  cryptopp/authenc.cpp \
+  cryptopp/base32.cpp \
+  cryptopp/base64.cpp \
+  cryptopp/basecode.cpp \
+  cryptopp/bench1.cpp \
+  cryptopp/bench2.cpp \
+  cryptopp/bfinit.cpp \
+  cryptopp/blake2.cpp \
+  cryptopp/blowfish.cpp \
+  cryptopp/blumshub.cpp \
+  cryptopp/camellia.cpp \
+  cryptopp/cast.cpp \
+  cryptopp/casts.cpp \
+  cryptopp/cbcmac.cpp \
+  cryptopp/ccm.cpp \
+  cryptopp/chacha.cpp \
+  cryptopp/channels.cpp \
+  cryptopp/cmac.cpp \
+  cryptopp/cpu.cpp \
+  cryptopp/crc.cpp \
+  cryptopp/datatest.cpp \
+  cryptopp/default.cpp \
+  cryptopp/des.cpp \
+  cryptopp/dessp.cpp \
+  cryptopp/dh.cpp \
+  cryptopp/dh2.cpp \
+  cryptopp/dll.cpp \
+  cryptopp/dlltest.cpp \
+  cryptopp/dsa.cpp \
+  cryptopp/eax.cpp \
+  cryptopp/ec2n.cpp \
+  cryptopp/eccrypto.cpp \
+  cryptopp/ecp.cpp \
+  cryptopp/elgamal.cpp \
+  cryptopp/emsa2.cpp \
+  cryptopp/eprecomp.cpp \
+  cryptopp/esign.cpp \
+  cryptopp/files.cpp \
+  cryptopp/filters.cpp \
+  cryptopp/fips140.cpp \
+  cryptopp/fipsalgt.cpp \
+  cryptopp/gcm.cpp \
+  cryptopp/gf2_32.cpp \
+  cryptopp/gf2n.cpp \
+  cryptopp/gf256.cpp \
+  cryptopp/gfpcrypt.cpp \
+  cryptopp/gost.cpp \
+  cryptopp/gzip.cpp \
+  cryptopp/hex.cpp \
+  cryptopp/hmac.cpp \
+  cryptopp/hrtimer.cpp \
+  cryptopp/ida.cpp \
+  cryptopp/idea.cpp \
+  cryptopp/integer.cpp \
+  cryptopp/iterhash.cpp \
+  cryptopp/keccak.cpp \
+  cryptopp/luc.cpp \
+  cryptopp/mars.cpp \
+  cryptopp/marss.cpp \
+  cryptopp/md2.cpp \
+  cryptopp/md4.cpp \
+  cryptopp/md5.cpp \
+  cryptopp/misc.cpp \
+  cryptopp/modes.cpp \
+  cryptopp/mqueue.cpp \
+  cryptopp/mqv.cpp \
+  cryptopp/nbtheory.cpp \
+  cryptopp/network.cpp \
+  cryptopp/oaep.cpp \
+  cryptopp/osrng.cpp \
+  cryptopp/panama.cpp \
+  cryptopp/pch.cpp \
+  cryptopp/pkcspad.cpp \
+  cryptopp/poly1305.cpp \
+  cryptopp/polynomi.cpp \
+  cryptopp/pssr.cpp \
+  cryptopp/pubkey.cpp \
+  cryptopp/queue.cpp \
+  cryptopp/rabin.cpp \
+  cryptopp/randpool.cpp \
+  cryptopp/rc2.cpp \
+  cryptopp/rc5.cpp \
+  cryptopp/rc6.cpp \
+  cryptopp/rdrand.cpp \
+  cryptopp/rdtables.cpp \
+  cryptopp/regtest.cpp \
+  cryptopp/rijndael.cpp \
+  cryptopp/ripemd.cpp \
+  cryptopp/rng.cpp \
+  cryptopp/rsa.cpp \
+  cryptopp/rw.cpp \
+  cryptopp/safer.cpp \
+  cryptopp/salsa.cpp \
+  cryptopp/seal.cpp \
+  cryptopp/seed.cpp \
+  cryptopp/serpent.cpp \
+  cryptopp/sha.cpp \
+  cryptopp/sha3.cpp \
+  cryptopp/shacal2.cpp \
+  cryptopp/shark.cpp \
+  cryptopp/sharkbox.cpp \
+  cryptopp/simple.cpp \
+  cryptopp/skipjack.cpp \
+  cryptopp/socketft.cpp \
+  cryptopp/square.cpp \
+  cryptopp/squaretb.cpp \
+  cryptopp/strciphr.cpp \
+  cryptopp/tea.cpp \
+  cryptopp/test.cpp \
+  cryptopp/tftables.cpp \
+  cryptopp/tiger.cpp \
+  cryptopp/tigertab.cpp \
+  cryptopp/trdlocal.cpp \
+  cryptopp/ttmac.cpp \
+  cryptopp/twofish.cpp \
+  cryptopp/validat0.cpp \
+  cryptopp/validat1.cpp \
+  cryptopp/validat2.cpp \
+  cryptopp/validat3.cpp \
+  cryptopp/vmac.cpp \
+  cryptopp/wait.cpp \
+  cryptopp/wake.cpp \
+  cryptopp/whrlpool.cpp \
+  cryptopp/winpipes.cpp \
+  cryptopp/xtr.cpp \
+  cryptopp/xtrcrypt.cpp \
+  cryptopp/zdeflate.cpp \
+  cryptopp/zinflate.cpp \
+  cryptopp/zlib.cpp \
+  crypto/sha256_sse4.cpp \
+  lux/luxstate.cpp \
+  lux/luxDGP.cpp \
+  crypto/sha256.cpp \
+  lux/storageresults.cpp \
   $(BITCOIN_CORE_H)
 
 if !ENABLE_WALLET
@@ -308,6 +670,8 @@ libbitcoin_wallet_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_wallet_a_SOURCES = \
   interfaces/wallet.cpp \
+  darksend.cpp \
+  stake.cpp \
   wallet/coincontrol.cpp \
   wallet/crypter.cpp \
   wallet/db.cpp \
@@ -321,6 +685,10 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/walletdb.cpp \
   wallet/walletutil.cpp \
   wallet/coinselection.cpp \
+  lux/luxstate.cpp \
+  lux/luxDGP.cpp \
+  lux/storageresults.cpp \
+  crypto/sha256.cpp \
   $(BITCOIN_CORE_H)
 
 libbitcoin_wallet_tool_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
@@ -354,7 +722,42 @@ crypto_libbitcoin_crypto_base_a_SOURCES = \
   crypto/sha512.cpp \
   crypto/sha512.h \
   crypto/siphash.cpp \
-  crypto/siphash.h
+  crypto/siphash.h \
+  #crypto/rfc6979_hmac_sha256.cpp \
+  #crypto/aes_helper.c \
+  crypto/echo.c \
+  crypto/cubehash.c \
+  crypto/jh.c \
+  crypto/skein.c \
+  crypto/gost.c \
+  crypto/fugue.c \
+  crypto/sha256_sse4.cpp \
+  crypto/lyra2/Lyra2.c \
+  crypto/lyra2/Sponge.c  \
+  crypto/rfc6979_hmac_sha256.h \
+  crypto/sph_types.h \
+  crypto/sph_jh.h \
+  crypto/sph_skein.h \
+  crypto/sph_fugue.h \
+  crypto/sph_gost.h \
+  crypto/sph_cubehash.h \
+  crypto/sph_echo.h \
+  crypto/lyra2/Lyra2.h \
+  crypto/lyra2/Sponge.h \
+  cpp-ethereum/utils/libscrypt/b64.c \
+  cpp-ethereum/utils/libscrypt/b64.h \
+  cpp-ethereum/utils/libscrypt/crypto-mcf.c \
+  cpp-ethereum/utils/libscrypt/crypto_scrypt-check.c \
+  cpp-ethereum/utils/libscrypt/crypto_scrypt-hexconvert.c \
+  cpp-ethereum/utils/libscrypt/crypto_scrypt-hexconvert.h \
+  cpp-ethereum/utils/libscrypt/crypto_scrypt-nosse.c \
+  cpp-ethereum/utils/libscrypt/crypto-scrypt-saltgen.c \
+  cpp-ethereum/utils/libscrypt/libscrypt.h \
+  cpp-ethereum/utils/libscrypt/sha256.c \
+  cpp-ethereum/utils/libscrypt/sha256.h \
+  cpp-ethereum/utils/libscrypt/slowequals.c \
+  cpp-ethereum/utils/libscrypt/slowequals.h \
+  cpp-ethereum/utils/libscrypt/sysendian.h
 
 if USE_ASM
 crypto_libbitcoin_crypto_base_a_SOURCES += crypto/sha256_sse4.cpp
@@ -440,6 +843,12 @@ libbitcoin_common_a_SOURCES = \
   script/standard.cpp \
   versionbitsinfo.cpp \
   warnings.cpp \
+  crypto/sha256.cpp \
+  crypto/sha256_sse4.cpp \
+  lux/luxstate.cpp \
+  lux/luxDGP.cpp \
+  lux/storageresults.cpp \
+  cpp-ethereum/libdevcore/CommonData.cpp \
   $(BITCOIN_CORE_H)
 
 # util: shared between all executables.
@@ -449,6 +858,7 @@ libbitcoin_util_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_util_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_util_a_SOURCES = \
   support/lockedpool.cpp \
+  activemasternode.h \
   chainparamsbase.cpp \
   clientversion.cpp \
   compat/glibc_sanity.cpp \
@@ -467,6 +877,7 @@ libbitcoin_util_a_SOURCES = \
   util/moneystr.cpp \
   util/strencodings.cpp \
   util/time.cpp \
+  crypto/sha256.cpp \
   $(BITCOIN_CORE_H)
 
 if GLIBC_BACK_COMPAT
@@ -478,6 +889,7 @@ endif
 libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
+  activemasternode.h \
   rpc/client.cpp \
   $(BITCOIN_CORE_H)
 

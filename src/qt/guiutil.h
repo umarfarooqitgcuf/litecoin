@@ -34,6 +34,7 @@ class QLineEdit;
 class QProgressDialog;
 class QUrl;
 class QWidget;
+class QToolButton;
 QT_END_NAMESPACE
 
 /** Utility functions used by the Bitcoin Qt UI.
@@ -252,6 +253,8 @@ namespace GUIUtil
 
     // Fix known bugs in QProgressDialog class.
     void PolishProgressDialog(QProgressDialog* dialog);
+
+    void formatToolButtons(QToolButton* btn1, QToolButton* btn2 = 0, QToolButton* btn3 = 0);
 } // namespace GUIUtil
 
 #endif // BITCOIN_QT_GUIUTIL_H

@@ -35,11 +35,15 @@ public:
 
     CAmount getTotalTransactionAmount() const;
 
+    void newPossibleKeyChange(CWallet* wallet);
+    CReserveKey* getPossibleKeyChange();
+
     void reassignAmounts(int nChangePosRet); // needed for the subtract-fee-from-amount feature
 
 private:
     QList<SendCoinsRecipient> recipients;
     std::unique_ptr<interfaces::PendingWalletTx> wtx;
+    std::unique_ptr<CReserveKey> keyChange;
     CAmount fee;
 };
 

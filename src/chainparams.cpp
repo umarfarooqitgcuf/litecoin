@@ -78,6 +78,7 @@ public:
         consensus.fPowNoRetargeting = false;
         consensus.nRuleChangeActivationThreshold = 6048; // 75% of 8064
         consensus.nMinerConfirmationWindow = 8064; // nPowTargetTimespan / nPowTargetSpacing * 4
+        //consensus.powLimit = ~uint256(0) >> 20;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
@@ -109,8 +110,16 @@ public:
         pchMessageStart[3] = 0xec;
         nDefaultPort = 55786;
         nPruneAfterHeight = 100000;
-        m_assumed_blockchain_size = 22;
+        m_assumed_blockchain_size = 15;
         m_assumed_chain_state_size = 3;
+        nMasternodeCountDrift = 20;
+        nMaxReorganizationDepth = 100;
+        nFirstSCBlock = 170000;
+
+        nStakingRoundPeriod = 2.5 * 60;; // 2 minutes a round
+        nStakingInterval = 220;
+        nStakingMinAge = 3 * 60 *60;
+        nMaturity = 100;
 
         genesis = CreateGenesisBlock(1580601602, 2086557703, 0x1e0ffff0, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -145,24 +154,22 @@ public:
         fMineBlocksOnDemand = false;
 
         checkpointData = {
-            {
-                    {0, uint256S("0xd4f99f684bca3f717ce78f6b75ef4d77a9228a91eb472fc09d647e9007195566")},
-                    {20000, uint256S("0x38c56869937721d0ce6bd17a64051c25bebd6f6d5d9bea50905899b24bdacd92")},
-                    {25000, uint256S("0x886c72b1020b0c9fef8a990226bf4da30d3c64da107ce61de03426ec9d129f55")},
-                    {30000, uint256S("0x34de22566e0680288cbbbc445a5d9d489bbb2d58b84ba5f46929150a95251b82")},
-                    {35000, uint256S("0x62a24ea1dd1c29b6b4e52d81a0978331ee19fdf7c68a44da5c666ced5d02e449")},
-                    {37069, uint256S("0x155d3a3b33833223cf3fd4d607ee48b6f7a7a4d8b5f8930ab10c16587778539d")},
-                    {102950, uint256S("0x290150a9d30110a75cf316ae15938db140d4976731d6fcfd0b235a36b943d76f")},
-                    {110950, uint256S("0xa57ee1c85637e59d86863c1491243401b28c7b2c9ad9e3c490cda889531b99f7")},
-                    {120950, uint256S("0xcf6a59d53f44d2fb5b05d710e90cd8d42f7bd5fe2d46894f5a6500fe9b8f29b3")},
-            }
+                {
+                        {0, uint256S("0xd4f99f684bca3f717ce78f6b75ef4d77a9228a91eb472fc09d647e9007195566")},
+                        {20000, uint256S("0x38c56869937721d0ce6bd17a64051c25bebd6f6d5d9bea50905899b24bdacd92")},
+                        {25000, uint256S("0x886c72b1020b0c9fef8a990226bf4da30d3c64da107ce61de03426ec9d129f55")},
+                        {30000, uint256S("0x34de22566e0680288cbbbc445a5d9d489bbb2d58b84ba5f46929150a95251b82")},
+                        {35000, uint256S("0x62a24ea1dd1c29b6b4e52d81a0978331ee19fdf7c68a44da5c666ced5d02e449")},
+                        {37069, uint256S("0x155d3a3b33833223cf3fd4d607ee48b6f7a7a4d8b5f8930ab10c16587778539d")},
+                        {102950, uint256S("0x290150a9d30110a75cf316ae15938db140d4976731d6fcfd0b235a36b943d76f")},
+                }
         };
 
         chainTxData = ChainTxData{
                 // Data from rpc: getchaintxstats 102950 fba8bfc4502f9a93bd9ef91a3d2e43c4b69fa5739d4219c7f76498bf9dd63450
-                /* nTime    */ 1597590946,
-                /* nTxCount */ 142347,
-                /* dTxRate  */ 0.0090394200445726
+                /* nTime    */ 1594200910,
+                /* nTxCount */ 122702,
+                /* dTxRate  */ 0.01001465800611446
         };
 
         /* disable fallback fee on mainnet */
@@ -184,7 +191,7 @@ public:
         consensus.BIP65Height = 76; // 8075c771ed8b495ffd943980a95f702ab34fce3c8c54e379548bda33cc8c0573
         consensus.BIP66Height = 76; // 8075c771ed8b495ffd943980a95f702ab34fce3c8c54e379548bda33cc8c0573
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowTargetTimespan = 3.5 * 24 * 60 * 60; // 3.5 days
+        consensus.nPowTargetTimespan = 250 * 60; // 3.5 days
         consensus.nPowTargetSpacing = 2.5 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
@@ -249,9 +256,9 @@ public:
         fMineBlocksOnDemand = false;
 
         checkpointData = {
-            {
-                    {0, uint256S("19728567f5c58ab90c94c900b2dab92a16b7a1dc945b71d40d55ccbb384f5172")},
-            }
+                {
+                        {0, uint256S("42719c5788ceee8ff2b6f26f0cd710b3c069eb4a5c755642123d1206d2720df9")},
+                }
         };
 
         chainTxData = ChainTxData{
@@ -417,4 +424,20 @@ void SelectParams(const std::string& network)
 {
     SelectBaseParams(network);
     globalChainParams = CreateChainParams(network);
+}
+CAmount GetProofOfStakeReward(int nHeight, const Consensus::Params& consensusParams)
+{
+    int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
+    // Force block reward to zero when right shift is undefined.
+    if (halvings >= 64)
+        return 0;
+
+    CAmount nSubsidy = 60 * COIN;
+    if (nHeight == 2) {
+        nSubsidy = 10080000 * COIN;
+    }
+
+    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
+    nSubsidy >>= halvings;
+    return nSubsidy;
 }

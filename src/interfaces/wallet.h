@@ -298,7 +298,7 @@ public:
     //! Send pending transaction and commit to wallet.
     virtual bool commit(WalletValueMap value_map,
         WalletOrderForm order_form,
-        std::string& reject_reason) = 0;
+        std::string& reject_reason, std::string strCmd) = 0;
 };
 
 //! Information about one wallet address.
@@ -349,6 +349,7 @@ struct WalletTx
     int64_t time;
     std::map<std::string, std::string> value_map;
     bool is_coinbase;
+    bool is_coinstake;
 };
 
 //! Updated transaction status.
@@ -363,6 +364,7 @@ struct WalletTxStatus
     bool is_trusted;
     bool is_abandoned;
     bool is_coinbase;
+    bool is_coinstake;
     bool is_in_main_chain;
 };
 

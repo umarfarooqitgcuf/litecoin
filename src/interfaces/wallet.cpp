@@ -51,12 +51,12 @@ public:
 
     bool commit(WalletValueMap value_map,
         WalletOrderForm order_form,
-        std::string& reject_reason) override
+        std::string& reject_reason,std::string strCmd) override
     {
         auto locked_chain = m_wallet.chain().lock();
         LOCK(m_wallet.cs_wallet);
         CValidationState state;
-        if (!m_wallet.CommitTransaction(m_tx, std::move(value_map), std::move(order_form), m_key, g_connman.get(), state)) {
+        if (!m_wallet.CommitTransaction(m_tx, std::move(value_map), std::move(order_form), m_key, g_connman.get(), state, strCmd)) {
             reject_reason = state.GetRejectReason();
             return false;
         }
@@ -93,6 +93,7 @@ WalletTx MakeWalletTx(interfaces::Chain::Lock& locked_chain, CWallet& wallet, co
     result.time = wtx.GetTxTime();
     result.value_map = wtx.mapValue;
     result.is_coinbase = wtx.IsCoinBase();
+    result.is_coinstake = wtx.IsCoinStake();
     return result;
 }
 
@@ -113,6 +114,7 @@ WalletTxStatus MakeWalletTxStatus(interfaces::Chain::Lock& locked_chain, const C
     result.is_trusted = wtx.IsTrusted(locked_chain);
     result.is_abandoned = wtx.isAbandoned();
     result.is_coinbase = wtx.IsCoinBase();
+    result.is_coinstake = wtx.IsCoinStake();
     result.is_in_main_chain = wtx.IsInMainChain(locked_chain);
     return result;
 }

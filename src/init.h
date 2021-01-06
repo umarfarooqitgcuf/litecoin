@@ -9,12 +9,13 @@
 #include <memory>
 #include <string>
 #include <util/system.h>
+#include "net.h"
 
 namespace interfaces {
 class Chain;
 class ChainClient;
 } // namespace interfaces
-
+//class CWallet;
 //! Pointers to interfaces used during init and destroyed on shutdown.
 struct InitInterfaces
 {

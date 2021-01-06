@@ -11,6 +11,12 @@
 #include <util/system.h>
 #include <util/strencodings.h>
 
+/////////////////////////////////////////////////////////// nexalt
+#include <lux/luxstate.h>
+#include <lux/luxtransaction.h>
+#include <lux/luxDGP.h>
+///////////////////////////////////////////////////////////
+
 
 typedef std::vector<unsigned char> valtype;
 
@@ -34,6 +40,8 @@ const char* GetTxnOutputType(txnouttype t)
     case TX_SCRIPTHASH: return "scripthash";
     case TX_MULTISIG: return "multisig";
     case TX_NULL_DATA: return "nulldata";
+    case TX_CREATE: return "create";
+    case TX_CALL: return "call";
     case TX_WITNESS_V0_KEYHASH: return "witness_v0_keyhash";
     case TX_WITNESS_V0_SCRIPTHASH: return "witness_v0_scripthash";
     case TX_WITNESS_UNKNOWN: return "witness_unknown";
@@ -89,6 +97,29 @@ static bool MatchMultisig(const CScript& script, unsigned int& required, std::ve
 
 txnouttype Solver(const CScript& scriptPubKey, std::vector<std::vector<unsigned char>>& vSolutionsRet)
 {
+    static std::multimap<txnouttype, CScript> mTemplates;
+    if (mTemplates.empty())
+    {
+        // Standard tx, sender provides pubkey, receiver adds signature
+        mTemplates.insert(std::make_pair(TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG));
+
+        // Bitcoin address tx, sender provides hash of pubkey, receiver provides signature and pubkey
+        mTemplates.insert(std::make_pair(TX_PUBKEYHASH, CScript() << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
+
+        // Sender provides N pubkeys, receivers provides M signatures
+        mTemplates.insert(std::make_pair(TX_MULTISIG, CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG));
+
+        // Contract creation tx
+        mTemplates.insert(std::make_pair(TX_CREATE, CScript() << OP_VERSION << OP_GAS_LIMIT << OP_GAS_PRICE << OP_DATA << OP_CREATE));
+
+        // Call contract tx
+        mTemplates.insert(std::make_pair(TX_CALL, CScript() << OP_VERSION << OP_GAS_LIMIT << OP_GAS_PRICE << OP_DATA << OP_PUBKEYHASH << OP_CALL));
+//        // Empty, provably prunable, data-carrying output
+//        if (GetBoolArg("-datacarrier", true))
+//            mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_RETURN << OP_SMALLDATA));
+        mTemplates.insert(std::make_pair(TX_NULL_DATA, CScript() << OP_RETURN));
+    }
+
     vSolutionsRet.clear();
 
     // Shortcut for pay-to-script-hash, which are more constrained than the other types:
@@ -146,6 +177,176 @@ txnouttype Solver(const CScript& scriptPubKey, std::vector<std::vector<unsigned 
         vSolutionsRet.insert(vSolutionsRet.end(), keys.begin(), keys.end());
         vSolutionsRet.push_back({static_cast<unsigned char>(keys.size())}); // safe as size is in range 1..16
         return TX_MULTISIG;
+    }
+
+    txnouttype typeRet;
+    // Scan templates
+    const CScript& script1 = scriptPubKey;
+    for (const PAIRTYPE(txnouttype, CScript)& tplate : mTemplates)
+    {
+        const CScript& script2 = tplate.second;
+        vSolutionsRet.clear();
+
+        opcodetype opcode1, opcode2;
+        std::vector<unsigned char> vch1, vch2;
+
+        VersionVM version;
+        version.rootVM=20; //set to some invalid value
+
+        // Compare
+        CScript::const_iterator pc1 = script1.begin();
+        CScript::const_iterator pc2 = script2.begin();
+        while (true)
+        {
+            if (pc1 == script1.end() && pc2 == script2.end())
+            {
+                // Found a match
+                typeRet = tplate.first;
+                if (typeRet == TX_MULTISIG)
+                {
+                    // Additional checks for TX_MULTISIG:
+                    unsigned char m = vSolutionsRet.front()[0];
+                    unsigned char n = vSolutionsRet.back()[0];
+                    //if (m < 1 || n < 1 || m > n || vSolutionsRet.size()-2 != n)
+                        //std::cout<<"return false here1\n";
+                        //return false;
+                }
+                //std::cout<<"return true here1\n";
+                //return true;
+            }
+            if (!script1.GetOp(pc1, opcode1, vch1))
+                break;
+            if (!script2.GetOp(pc2, opcode2, vch2))
+                break;
+
+            // Template matching opcodes:
+            if (opcode2 == OP_PUBKEYS)
+            {
+                while (vch1.size() >= 33 && vch1.size() <= 65)
+                {
+                    vSolutionsRet.push_back(vch1);
+                    if (!script1.GetOp(pc1, opcode1, vch1))
+                        break;
+                }
+                if (!script2.GetOp(pc2, opcode2, vch2))
+                    break;
+                // Normal situation is to fall through
+                // to other if/else statements
+            }
+
+            if (opcode2 == OP_PUBKEY)
+            {
+                if (vch1.size() < 33 || vch1.size() > 65)
+                    break;
+                vSolutionsRet.push_back(vch1);
+            }
+            else if (opcode2 == OP_PUBKEYHASH)
+            {
+                if (vch1.size() != sizeof(uint160))
+                    break;
+                vSolutionsRet.push_back(vch1);
+            }
+            else if (opcode2 == OP_SMALLINTEGER)
+            {   // Single-byte small integer pushed onto vSolutions
+                if (opcode1 == OP_0 ||
+                    (opcode1 >= OP_1 && opcode1 <= OP_16))
+                {
+                    char n = (char)CScript::DecodeOP_N(opcode1);
+                    vSolutionsRet.push_back(valtype(1, n));
+                }
+                else
+                    break;
+            }
+                /////////////////////////////////////////////////////////// lux
+            else if (opcode2 == OP_VERSION)
+            {
+                if(0 <= opcode1 && opcode1 <= OP_PUSHDATA4)
+                {
+                    if(vch1.empty() || vch1.size() > 4 || (vch1.back() & 0x80))
+                        //std::cout<<"return false here 2\n";
+                        //return false;
+
+                    version = VersionVM::fromRaw(CScriptNum::vch_to_uint64(vch1));
+                    if(!(version.toRaw() == VersionVM::GetEVMDefault().toRaw() || version.toRaw() == VersionVM::GetNoExec().toRaw())){
+                        // only allow standard EVM and no-exec transactions to live in mempool
+                        //std::cout<<"return false here 3\n";
+                        //return false;
+                    }
+                }
+            }
+            else if(opcode2 == OP_GAS_LIMIT) {
+                try {
+                    uint64_t val = CScriptNum::vch_to_uint64(vch1);
+                    bool contractConsensus  = false;
+                    if(contractConsensus) {
+                        //consensus rules (this is checked more in depth later using DGP)
+                        if (version.rootVM != 0 && val < 1) {
+                            //std::cout<<"return false here 3\n";
+                            //return false;
+                        }
+                        if (val > MAX_BLOCK_GAS_LIMIT_DGP) {
+                            //do not allow transactions that could use more gas than is in a block
+                            //std::cout<<"return false here 4\n";
+                            //return false;
+                        }
+                    }else{
+                        //standard mempool rules for contracts
+                        //consensus rules for contracts
+                        if (version.rootVM != 0 && val < STANDARD_MINIMUM_GAS_LIMIT) {
+                            //std::cout<<"return false here 5\n";
+                            //return false;
+                        }
+                        if (val > DEFAULT_BLOCK_GAS_LIMIT_DGP / 2) {
+                            //std::cout<<"return false here 6\n";
+                            //don't allow transactions that use more than 1/2 block of gas to be broadcast on the mempool
+                            //return false;
+                        }
+
+                    }
+                }
+                catch (const scriptnum_error &err) {
+                    //std::cout<<"return false here 7\n";
+                    //return false;
+                }
+            }
+            else if(opcode2 == OP_GAS_PRICE) {
+                try {
+                    uint64_t val = CScriptNum::vch_to_uint64(vch1);
+                    bool contractConsensus  = false;
+                    if(contractConsensus) {
+                        //consensus rules (this is checked more in depth later using DGP)
+                        if (version.rootVM != 0 && val < 1) {
+                            //std::cout<<"return false here 8\n";
+                            //return false;
+                        }
+                    }else{
+                        //standard mempool rules
+                        if (version.rootVM != 0 && val < STANDARD_MINIMUM_GAS_PRICE) {
+                            //std::cout<<"return false here 9\n";
+                            //return false;
+                        }
+                    }
+                }
+                catch (const scriptnum_error &err) {
+                    //std::cout<<"return false here 10\n";
+                    //return false;
+                }
+            }
+            else if(opcode2 == OP_DATA)
+            {
+                if(0 <= opcode1 && opcode1 <= OP_PUSHDATA4)
+                {
+                    if(vch1.empty())
+                        break;
+                }
+            }
+                ///////////////////////////////////////////////////////////
+            else if (opcode1 != opcode2 || vch1 != vch2)
+            {
+                // Others must match exactly
+                break;
+            }
+        }
     }
 
     vSolutionsRet.clear();

@@ -19,6 +19,7 @@
 #include <script/script_error.h>
 #include <sync.h>
 #include <versionbits.h>
+#include <net.h>
 
 #include <algorithm>
 #include <exception>
@@ -31,6 +32,33 @@
 #include <vector>
 
 #include <atomic>
+
+//#include <boost/unordered_map.hpp>
+
+/**
+ * Global LuxState
+ */
+
+/////////////////////////////////////////// lux
+#include <lux/luxstate.h>
+#include <lux/luxDGP.h>
+#include <cpp-ethereum/libethereum/ChainParams.h>
+#include <cpp-ethereum/libethashseal/Ethash.h>
+#include <cpp-ethereum/libethashseal/GenesisInfo.h>
+#include <script/standard.h>
+#include <lux/storageresults.h>
+///////////////////////////////////////////
+
+extern std::unique_ptr<LuxState> globalState;
+extern std::shared_ptr<dev::eth::SealEngineFace> globalSealEngine;
+extern bool fRecordLogOpcodes;
+extern bool fIsVMlogFile;
+extern bool fGettingValuesDGP;
+
+struct EthTransactionParams;
+using valtype = std::vector<unsigned char>;
+using ExtractLuxTX = std::pair<std::vector<LuxTransaction>, std::vector<EthTransactionParams>>;
+///////////////////////////////////////////
 
 class CBlockIndex;
 class CBlockTreeDB;
@@ -113,6 +141,49 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 /** Maximum age of our tip in seconds for us to be considered current for fee estimation */
 static const int64_t MAX_FEE_ESTIMATION_TIP_AGE = 3 * 60 * 60;
+
+#define START_MASTERNODE_PAYMENTS 1610172000
+#define START_POS_BLOCK 1610172000
+static const int64_t DARKSEND_COLLATERAL = (10000*COIN); //10000 XLT
+static const int64_t DARKSEND_FEE = (0.002*COIN); // reward masternode
+static const int64_t DARKSEND_POOL_MAX = (1999999.99*COIN);
+inline int64_t GetMNCollateral(int nHeight) {
+    //if (IsTestNet() || Params().NetworkID() == CBaseChainParams::SEGWITTEST || Params().NetworkID() == CBaseChainParams::REGTEST) return 50;
+    return nHeight>=30000 ? 10000 : 10000;
+}
+
+////////////////////////////////////////////////////// lux
+static const uint64_t DEFAULT_GAS_LIMIT_OP_CREATE=5000000;
+static const uint64_t DEFAULT_GAS_LIMIT_OP_SEND=5000000;
+static const CAmount DEFAULT_GAS_PRICE=0.00000040*COIN;
+static const CAmount MAX_RPC_GAS_PRICE=0.00000100*COIN;
+
+static const size_t MAX_CONTRACT_VOUTS = 1000;
+
+/** Minimum gas limit that is allowed in a transaction within a block - prevent various types of tx and mempool spam **/
+static const uint64_t MINIMUM_GAS_LIMIT = 10000;
+
+static const uint64_t MEMPOOL_MIN_GAS_LIMIT = 22000;
+
+/** The maximum allowed size for a serialized block, in bytes (only for buffer size limits) */
+extern unsigned int dgpMaxBlockSerSize;
+/** The maximum allowed weight for a block, see BIP 141 (network rule) */
+extern unsigned int dgpMaxBlockWeight;
+/** The maximum allowed size for a block excluding witness data, in bytes (network rule) */
+extern unsigned int dgpMaxBlockBaseSize;
+
+extern unsigned int dgpMaxBlockSize; // lux
+
+/** The maximum allowed number of signature check operations in a block (network rule) */
+extern int64_t dgpMaxBlockSigOps;
+
+extern unsigned int dgpMaxProtoMsgLength;
+
+extern unsigned int dgpMaxTxSigOps;
+void updateBlockSizeParams(unsigned int newBlockSize);
+
+
+//////////////////////////////////////////////////////
 
 /** Default for -permitbaremultisig */
 static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
@@ -266,6 +337,19 @@ void UnloadBlockIndex();
 void ThreadScriptCheck();
 /** Check whether we are doing an initial block download (synchronizing from disk or network) */
 bool IsInitialBlockDownload();
+
+uint256 GetProofOfStakeLimit(int nHeight);
+
+CAmount GetMasternodePosReward(int nHeight, CAmount blockValue);
+
+CAmount MagicBlockReward(int nHeight, CAmount blockValue);
+
+CAmount UpLineReward(int nHeight, CAmount blockValue);
+
+CAmount MainMinerReward(int nHeight, CAmount blockValue);
+
+bool IsMagicBlock(int nHeight);
+
 /** Retrieve a transaction (from memory pool, or from disk, if possible) */
 bool GetTransaction(const uint256& hash, CTransactionRef& tx, const Consensus::Params& params, uint256& hashBlock, const CBlockIndex* const blockIndex = nullptr);
 /**
@@ -305,6 +389,75 @@ void PruneBlockFilesManual(int nManualPruneHeight);
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransactionRef &tx,
                         bool* pfMissingInputs, std::list<CTransactionRef>* plTxnReplaced,
                         bool bypass_limits, const CAmount nAbsurdFee, bool test_accept=false) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
+bool AcceptableInputs(CTxMemPool& pool, CValidationState& state, const CTransaction& tx, bool fLimitFree, bool* pfMissingInputs, bool fRejectInsaneFee = false,
+                      bool isDSTX = false);
+
+bool CheckSenderScript(const CCoinsViewCache& view, const CTransaction& tx);
+
+CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowFree);
+
+bool checkforposblockstarted(const CBlockHeader& header);
+
+//////////////////////////////////////////////////////////// // lux
+struct CHeightTxIndexIteratorKey {
+    unsigned int height;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+        READWRITE(height);
+    }
+
+    CHeightTxIndexIteratorKey(unsigned int _height) {
+        height = _height;
+    }
+
+    CHeightTxIndexIteratorKey() {
+        SetNull();
+    }
+
+    void SetNull() {
+        height = 0;
+    }
+};
+
+struct CHeightTxIndexKey {
+    unsigned int height;
+    dev::h160 address;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+        READWRITE(height);
+        if (ser_action.ForRead()) {
+            valtype tmp;
+            READWRITE(tmp);
+            address = dev::h160(tmp);
+        } else {
+            valtype tmp = address.asBytes();
+            READWRITE(tmp);
+        }
+    }
+
+    CHeightTxIndexKey(unsigned int _height, dev::h160 _address) {
+        height = _height;
+        address = _address;
+    }
+
+    CHeightTxIndexKey() {
+        SetNull();
+    }
+
+    void SetNull() {
+        height = 0;
+        address.clear();
+    }
+};
+
+////////////////////////////////////////////////////////////
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
@@ -417,7 +570,7 @@ bool RewindBlockIndex(const CChainParams& params);
 void UpdateUncommittedBlockStructures(CBlock& block, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams);
 
 /** Produce the necessary coinbase commitment for a block (modifies the hash, don't call for mined blocks). */
-std::vector<unsigned char> GenerateCoinbaseCommitment(CBlock& block, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams);
+std::vector<unsigned char> GenerateCoinbaseCommitment(CBlock& block, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams, bool fProofOfStake);
 
 /** RAII wrapper for VerifyDB: Verify consistency of the block and coin databases */
 class CVerifyDB {
@@ -496,10 +649,99 @@ bool DumpMempool();
 /** Load the mempool from disk. */
 bool LoadMempool();
 
+int GetInputAge(CTxIn& vin);
+
 //! Check whether the block associated with this index entry is pruned or not.
 inline bool IsBlockPruned(const CBlockIndex* pblockindex)
 {
     return (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0);
 }
+
+//////////////////////////////////////////////////////// lux
+std::vector<ResultExecute> CallContract(const dev::Address& addrContract, std::vector<unsigned char> opcode, const dev::Address& sender = dev::Address(), uint64_t gasLimit=0);
+
+bool CheckRefund(const CBlock& block, const std::vector<CTxOut>& vouts);
+
+bool CheckMinGasPrice(std::vector<EthTransactionParams>& etps, const uint64_t& minGasPrice);
+
+struct ByteCodeExecResult;
+
+void writeVMlog(const std::vector<ResultExecute>& res, const CTransaction& tx = CTransaction(), const CBlock& block = CBlock());
+
+struct EthTransactionParams{
+    VersionVM version;
+    dev::u256 gasLimit;
+    dev::u256 gasPrice;
+    valtype code;
+    dev::Address receiveAddress;
+
+    bool operator!=(EthTransactionParams etp){
+        if(this->version.toRaw() != etp.version.toRaw() || this->gasLimit != etp.gasLimit ||
+           this->gasPrice != etp.gasPrice || this->code != etp.code ||
+           this->receiveAddress != etp.receiveAddress)
+            return true;
+        return false;
+    }
+};
+
+struct ByteCodeExecResult{
+    uint64_t usedGas = 0;
+    CAmount refundSender = 0;
+    std::vector<CTxOut> refundOutputs;
+    std::vector<CTransaction> valueTransfers;
+};
+
+class LuxTxConverter{
+
+public:
+
+    LuxTxConverter(CTransaction tx, CCoinsViewCache* v = NULL, const std::vector<CTransaction>* blockTxs = NULL) : txBit(tx), view(v), blockTransactions(blockTxs){}
+
+    bool extractionLuxTransactions(ExtractLuxTX& luxTx);
+
+private:
+
+    bool receiveStack(const CScript& scriptPubKey);
+
+    bool parseEthTXParams(EthTransactionParams& params);
+
+    LuxTransaction createEthTX(const EthTransactionParams& etp, const uint32_t nOut);
+
+    const CTransaction txBit;
+    const CCoinsViewCache* view;
+    std::vector<valtype> stack;
+    opcodetype opcode;
+    const std::vector<CTransaction> *blockTransactions;
+
+};
+
+class ByteCodeExec {
+
+public:
+
+    ByteCodeExec(const CBlock& _block, std::vector<LuxTransaction> _txs, const uint64_t _blockGasLimit) : txs(_txs), block(_block), blockGasLimit(_blockGasLimit) {}
+
+    bool performByteCode(dev::eth::Permanence type = dev::eth::Permanence::Committed);
+
+    bool processingResults(ByteCodeExecResult& result);
+
+    std::vector<ResultExecute>& getResult(){ return result; }
+
+private:
+
+    dev::eth::EnvInfo BuildEVMEnvironment();
+
+    dev::Address EthAddrFromScript(const CScript& scriptIn);
+
+    std::vector<LuxTransaction> txs;
+
+    std::vector<ResultExecute> result;
+
+    const CBlock& block;
+
+    const uint64_t blockGasLimit;
+
+};
+////////////////////////////////////////////////////////
 
 #endif // BITCOIN_VALIDATION_H

@@ -14,6 +14,10 @@
 #include <stdint.h>
 
 static const bool DEFAULT_ACCEPT_DATACARRIER = true;
+static const uint64_t STANDARD_MINIMUM_GAS_LIMIT = 10000;
+//contract executions with a price cheaper than this (in nexis) are not standard
+//TODO this needs to be controlled by DGP and needs to be propogated from consensus parameters
+static const uint64_t STANDARD_MINIMUM_GAS_PRICE = 1;
 
 class CKeyID;
 class CScript;
@@ -62,6 +66,8 @@ enum txnouttype
     TX_SCRIPTHASH,
     TX_MULTISIG,
     TX_NULL_DATA, //!< unspendable OP_RETURN script that carries data
+    TX_CREATE,
+    TX_CALL,
     TX_WITNESS_V0_SCRIPTHASH,
     TX_WITNESS_V0_KEYHASH,
     TX_WITNESS_UNKNOWN, //!< Only for Witness versions not already defined above

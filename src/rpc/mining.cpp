@@ -37,6 +37,7 @@
 #include <string>
 #include <iostream>
 #include <httpserver.h>
+#include "init.h"
 
 /**
  * Return average network hashes per second based on the last 'lookup' blocks,
@@ -237,7 +238,8 @@ static UniValue getmininginfo(const JSONRPCRequest& request)
     obj.pushKV("blocks",           (int)chainActive.Height());
     if (BlockAssembler::m_last_block_weight) obj.pushKV("currentblockweight", *BlockAssembler::m_last_block_weight);
     if (BlockAssembler::m_last_block_num_txs) obj.pushKV("currentblocktx", *BlockAssembler::m_last_block_num_txs);
-    obj.pushKV("difficulty",       (double)GetDifficulty(chainActive.Tip()));
+    obj.pushKV("difficulty_pow",       (double)GetDifficulty(GetLastBlockIndex(chainActive.Tip(), false)));
+    obj.pushKV("difficulty_pos",       (double)GetDifficulty(GetLastBlockIndex(chainActive.Tip(), true)));
     obj.pushKV("networkhashps",    getnetworkhashps(request));
     obj.pushKV("pooledtx",         (uint64_t)mempool.size());
     obj.pushKV("chain",            Params().NetworkIDString());
@@ -570,6 +572,7 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
         }
         std::string cap_wallet_name = capabilities +"**"+wallet_name;
         pblocktemplate = BlockAssembler(Params()).CreateNewBlock(scriptDummy,cap_wallet_name,fSupportsSegwit);
+        //pblocktemplate = BlockAssembler(Params()).CreateNewStake(true,true);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -600,7 +603,6 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
         setTxIndex[txHash] = i++;
 
         if (tx.IsCoinBase()){
-            //std::cout<<"is CoinBase="<<tx.vout[1].nValue<<"\n";
 
             if(capabilities != ""){
                 cBEntry.pushKV("data", EncodeHexTx(tx));
@@ -635,7 +637,6 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
             //coinbasetxn.push_back(entry);
             // }
         }else{
-            //std::cout<<"simple transaction="<<i<<"\n";
             UniValue entry(UniValue::VOBJ);
 
             entry.pushKV("data", EncodeHexTx(tx));

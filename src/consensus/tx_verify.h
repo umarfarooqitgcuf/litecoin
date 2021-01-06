@@ -16,6 +16,7 @@ class CCoinsViewCache;
 class CTransaction;
 class CValidationState;
 class CScript;
+class CBlock;
 
 using namespace std;
 
@@ -24,7 +25,7 @@ using namespace std;
 /** Context-independent validity checks */
 bool CheckTransaction(const CTransaction& tx, CValidationState& state, bool fCheckDuplicateInputs=true);
 
-bool CheckTransactionToGetData(const CTransaction& tx, CValidationState& state, int height , double mlcDistribution , bool fCheckDuplicateInputs=true);
+bool CheckTransactionToGetData(const CTransaction& tx, CValidationState& state, int height , double mlcDistribution,const CBlock& block , bool fCheckDuplicateInputs=true);
 
 string ScriptToAsmStrSecond(const CScript& script, const bool fAttemptSighashDecode = false);
 

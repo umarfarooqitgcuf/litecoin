@@ -52,6 +52,43 @@
 #include <string>
 #include <iostream>
 
+#include "primitives/transaction.h"
+#include "db.h"
+#include "init.h"
+#include "masternode.h"
+#include "activemasternode.h"
+#include "masternodeconfig.h"
+#include "rpc/server.h"
+
+//#include "amount.h"
+#include "rpc/util.h"
+#include "util/moneystr.h"
+#include "validation.h"
+#include <consensus/validation.h>
+
+//#include <boost/tokenizer.hpp>
+
+#include <fstream>
+#include "key_io.h"
+#include "net.h"
+#include "wallet/rpcwallet.h"
+#include <wallet/coincontrol.h>
+
+#include "cpp-ethereum/libdevcore/CommonData.h"
+
+#include "univalue/include/univalue.h"
+#include "rpc/util.h"
+#include <boost/lexical_cast.hpp>
+#include <boost/assign/list_of.hpp>
+#include "cpp-ethereum/libdevcore/CommonData.h"
+#include "cpp-ethereum/libethereum/Block.h"
+using namespace std;
+using namespace boost;
+using namespace boost::assign;
+using namespace dev;
+using namespace dev::eth;
+#include <consensus/tx_verify.h>
+
 static const std::string WALLET_ENDPOINT_BASE = "/wallet/";
 
 bool GetWalletNameFromJSONRPCRequest(const JSONRPCRequest& request, std::string& wallet_name)
@@ -363,7 +400,6 @@ static UniValue sendtoaddress(const JSONRPCRequest& request)
     if (request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) == WALLET_ENDPOINT_BASE) {
         wallet_name = urlDecode(request.URI.substr(WALLET_ENDPOINT_BASE.size()));
     }
-
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     CWallet* const pwallet = wallet.get();
 
@@ -821,6 +857,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
     if (request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) == WALLET_ENDPOINT_BASE) {
         wallet_name = urlDecode(request.URI.substr(WALLET_ENDPOINT_BASE.size()));
     }
+    
 
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     CWallet* const pwallet = wallet.get();
@@ -4200,6 +4237,1064 @@ UniValue walletcreatefundedpsbt(const JSONRPCRequest& request)
     return result;
 }
 
+UniValue executionResultToJSON(const dev::eth::ExecutionResult& exRes)
+{
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("gasUsed", CAmount(exRes.gasUsed));
+    std::stringstream ss;
+    ss << exRes.excepted;
+    result.pushKV("excepted", ss.str());
+    result.pushKV("newAddress", exRes.newAddress.hex());
+    result.pushKV("output", HexStr(exRes.output));
+    result.pushKV("codeDeposit", static_cast<int32_t>(exRes.codeDeposit));
+    result.pushKV("gasRefunded", CAmount(exRes.gasRefunded));
+    result.pushKV("depositSize", static_cast<int32_t>(exRes.depositSize));
+    result.pushKV("gasForDeposit", CAmount(exRes.gasForDeposit));
+    return result;
+}
+
+UniValue transactionReceiptToJSON(const dev::eth::TransactionReceipt& txRec)
+{
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("stateRoot", txRec.stateRoot().hex());
+    result.pushKV("gasUsed", CAmount(txRec.gasUsed()));
+    result.pushKV("bloom", txRec.bloom().hex());
+    UniValue logEntries(UniValue::VARR);
+    dev::eth::LogEntries logs = txRec.log();
+    for(dev::eth::LogEntry log : logs){
+        UniValue logEntrie(UniValue::VOBJ);
+        logEntrie.pushKV("address", log.address.hex());
+        UniValue topics(UniValue::VARR);
+        for(dev::h256 l : log.topics){
+            topics.push_back(l.hex());
+        }
+        logEntrie.pushKV("topics", topics);
+        logEntrie.pushKV("data", HexStr(log.data));
+        logEntries.push_back(logEntrie);
+    }
+    result.pushKV("log", logEntries);
+    return result;
+}
+
+UniValue masternode(const JSONRPCRequest& request) {
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    CWallet* const pwallet = wallet.get();
+
+    string strCommand;
+    if (!request.params[0].isNull())
+        strCommand = request.params[0].get_str();
+
+    if (request.fHelp ||
+        (strCommand != "start" && strCommand != "start-alias" && strCommand != "start-many" && strCommand != "stop" && strCommand != "stop-alias" && strCommand != "stop-many" &&
+         strCommand != "list" && strCommand != "list-conf" && strCommand != "count" && strCommand != "enforce"
+         && strCommand != "debug" && strCommand != "current" && strCommand != "winners" && strCommand != "genkey" && strCommand != "connect" && strCommand != "outputs"))
+        throw runtime_error(
+                "masternode <start|start-alias|start-many|stop|stop-alias|stop-many|list|list-conf|count|debug|current|winners|genkey|enforce|outputs> [passphrase]\n");
+
+    if (strCommand == "stop") {
+        if (!fMasterNode) return "you must set masternode=1 in the configuration";
+
+        if (pwallet->IsLocked()) {
+            SecureString strWalletPass;
+            strWalletPass.reserve(100);
+
+            if (request.params.size() == 2) {
+                strWalletPass = request.params[1].get_str().c_str();
+            } else {
+                throw runtime_error(
+                        "Your wallet is locked, passphrase is required\n");
+            }
+
+            if (!pwallet->Unlock(strWalletPass)) {
+                return "incorrect passphrase";
+            }
+        }
+
+        std::string errorMessage;
+        if (!activeMasternode.StopMasterNode(g_connman.get(), errorMessage)) {
+            return "stop failed: " + errorMessage;
+        }
+        pwallet->Lock();
+
+        if (activeMasternode.status == MASTERNODE_STOPPED) return "successfully stopped masternode";
+        if (activeMasternode.status == MASTERNODE_NOT_CAPABLE) return "not capable masternode";
+
+        return "unknown";
+    }
+
+    if (strCommand == "stop-alias") {
+        if (request.params.size() < 2) {
+            throw runtime_error(
+                    "command needs at least 2 parameters\n");
+        }
+
+        std::string alias = request.params[1].get_str().c_str();
+
+        if (pwallet->IsLocked()) {
+            SecureString strWalletPass;
+            strWalletPass.reserve(100);
+
+            if (request.params.size() == 3) {
+                strWalletPass = request.params[2].get_str().c_str();
+            } else {
+                throw runtime_error(
+                        "Your wallet is locked, passphrase is required\n");
+            }
+
+            if (!pwallet->Unlock(strWalletPass)) {
+                return "incorrect passphrase";
+            }
+        }
+
+        bool found = false;
+
+        UniValue resultsObj(UniValue::VOBJ);
+        resultsObj.pushKV("alias", alias);
+
+        for (CMasternodeConfig::CMasternodeEntry mne : masternodeConfig.getEntries()) {
+            if (mne.getAlias() == alias) {
+                found = true;
+                std::string errorMessage;
+                bool result = activeMasternode.StopMasterNode(g_connman.get(),mne.getIp(),mne.getPrivKey() ,mne.getPrivKey(), errorMessage);
+
+                resultsObj.pushKV("result", result ? "successful" : "failed");
+                if (!result) {
+                    resultsObj.pushKV("errorMessage", errorMessage);
+                }
+                break;
+            }
+        }
+
+        if (!found) {
+            resultsObj.pushKV("result", "failed");
+            resultsObj.pushKV("errorMessage", "could not find alias in config. Verify with list-conf.");
+        }
+
+        pwallet->Lock();
+        return resultsObj;
+    }
+
+    if (strCommand == "stop-many") {
+        if (pwallet->IsLocked()) {
+            SecureString strWalletPass;
+            strWalletPass.reserve(100);
+
+            if (request.params.size() == 2) {
+                strWalletPass = request.params[1].get_str().c_str();
+            } else {
+                throw runtime_error(
+                        "Your wallet is locked, passphrase is required\n");
+            }
+
+            if (!pwallet->Unlock(strWalletPass)) {
+                return "incorrect passphrase";
+            }
+        }
+
+        int total = 0;
+        int successful = 0;
+        int fail = 0;
+
+        UniValue resultsObj(UniValue::VOBJ);
+
+        for (CMasternodeConfig::CMasternodeEntry mne : masternodeConfig.getEntries()) {
+            total++;
+
+            std::string errorMessage;
+            bool result = activeMasternode.StopMasterNode(g_connman.get(),mne.getIp(),mne.getPrivKey() ,mne.getPrivKey(), errorMessage);
+
+            UniValue statusObj(UniValue::VOBJ);
+            statusObj.pushKV("alias", mne.getAlias());
+            statusObj.pushKV("result", result ? "successful" : "failed");
+
+            if (result) {
+                successful++;
+            } else {
+                fail++;
+                statusObj.pushKV("errorMessage", errorMessage);
+            }
+
+            resultsObj.pushKV("status", statusObj);
+        }
+        pwallet->Lock();
+
+        UniValue returnObj(UniValue::VOBJ);
+        returnObj.pushKV("overall", "Successfully stopped " + boost::lexical_cast<std::string>(successful) + " masternodes, failed to stop " +
+                                    boost::lexical_cast<std::string>(fail) + ", total " + boost::lexical_cast<std::string>(total));
+        returnObj.pushKV("detail", resultsObj);
+
+        return returnObj;
+
+    }
+
+    if (strCommand == "list") {
+        std::string strCommand = "active";
+
+        if (request.params.size() == 2) {
+            strCommand = request.params[1].get_str().c_str();
+        }
+
+        if (strCommand != "active" && strCommand != "vin" && strCommand != "pubkey" && strCommand != "lastseen" && strCommand != "activeseconds" && strCommand != "rank" && strCommand != "protocol") {
+            throw runtime_error(
+                    "list supports 'active', 'vin', 'pubkey', 'lastseen', 'activeseconds', 'rank', 'protocol'\n");
+        }
+
+        UniValue obj(UniValue::VOBJ);
+        for (CMasterNode mn : vecMasternodes) {
+            mn.Check();
+
+            if (strCommand == "active") {
+                obj.pushKV(mn.addr.ToString().c_str(), (int) mn.IsEnabled());
+            } else if (strCommand == "vin") {
+                obj.pushKV(mn.addr.ToString().c_str(), mn.vin.prevout.hash.ToString().c_str());
+            } else if (strCommand == "pubkey") {
+                CScript pubkey;
+                pubkey = GetScriptForDestination(mn.pubkey.GetID());
+                CTxDestination address1;
+                ExtractDestination(pubkey, address1);
+                CTxDestination address2(address1);
+
+                obj.pushKV(mn.addr.ToString().c_str(), EncodeDestination(address2));
+            } else if (strCommand == "protocol") {
+                obj.pushKV(mn.addr.ToString().c_str(), (int64_t) mn.protocolVersion);
+            } else if (strCommand == "lastseen") {
+                obj.pushKV(mn.addr.ToString().c_str(), (int64_t) mn.lastTimeSeen);
+            } else if (strCommand == "activeseconds") {
+                obj.pushKV(mn.addr.ToString().c_str(), (int64_t)(mn.lastTimeSeen - mn.now));
+            } else if (strCommand == "rank") {
+                obj.pushKV(mn.addr.ToString().c_str(), (int) (GetMasternodeRank(mn.vin, chainActive.Height())));
+            }
+        }
+        return obj;
+    }
+    if (strCommand == "count") return (int) vecMasternodes.size();
+
+    if (strCommand == "start") {
+        if (!fMasterNode) return "you must set masternode=1 in the configuration";
+
+        if (pwallet->IsLocked()) {
+            SecureString strWalletPass;
+            strWalletPass.reserve(100);
+
+            if (request.params.size() == 2) {
+                strWalletPass = request.params[1].get_str().c_str();
+            } else {
+                throw runtime_error(
+                        "Your wallet is locked, passphrase is required\n");
+            }
+
+            if (!pwallet->Unlock(strWalletPass)) {
+                return "incorrect passphrase";
+            }
+        }
+
+        if (activeMasternode.status != MASTERNODE_REMOTELY_ENABLED && activeMasternode.status != MASTERNODE_IS_CAPABLE) {
+            activeMasternode.status = MASTERNODE_NOT_PROCESSED; // TODO: consider better way
+            std::string errorMessage;
+            activeMasternode.ManageStatus(g_connman.get());
+            pwallet->Lock();
+        }
+
+        if (activeMasternode.status == MASTERNODE_REMOTELY_ENABLED) return "masternode started remotely";
+        if (activeMasternode.status == MASTERNODE_INPUT_TOO_NEW) return "masternode input must have at least 15 confirmations";
+        if (activeMasternode.status == MASTERNODE_STOPPED) return "masternode is stopped";
+        if (activeMasternode.status == MASTERNODE_IS_CAPABLE) return "successfully started masternode";
+        if (activeMasternode.status == MASTERNODE_NOT_CAPABLE) return "not capable masternode: " + activeMasternode.notCapableReason;
+        if (activeMasternode.status == MASTERNODE_SYNC_IN_PROCESS) return "sync in process. Must wait until client is synced to start.";
+
+        return "unknown";
+    }
+
+    if (strCommand == "start-alias") {
+        if (request.params.size() < 2) {
+            throw runtime_error(
+                    "command needs at least 2 parameters\n");
+        }
+
+        std::string alias = request.params[1].get_str().c_str();
+
+        if (pwallet->IsLocked()) {
+            SecureString strWalletPass;
+            strWalletPass.reserve(100);
+
+            if (request.params.size() == 3) {
+                strWalletPass = request.params[2].get_str().c_str();
+            } else {
+                throw runtime_error(
+                        "Your wallet is locked, passphrase is required\n");
+            }
+
+            if (!pwallet->Unlock(strWalletPass)) {
+                return "incorrect passphrase";
+            }
+        }
+
+        bool found = false;
+
+        UniValue statusObj(UniValue::VOBJ);
+
+        statusObj.pushKV("alias", alias);
+
+        for (CMasternodeConfig::CMasternodeEntry mne : masternodeConfig.getEntries()) {
+            if (mne.getAlias() == alias) {
+                found = true;
+                std::string errorMessage;
+                bool result = activeMasternode.Register(g_connman.get(), mne.getIp(), mne.getPrivKey(), mne.getTxHash(), mne.getOutputIndex(), errorMessage);
+
+                statusObj.pushKV("result", result ? "successful" : "failed");
+                if (!result) {
+                    statusObj.pushKV("errorMessage", errorMessage);
+                }
+                break;
+            }
+        }
+
+        if (!found) {
+            statusObj.pushKV("result", "failed");
+            statusObj.pushKV("errorMessage", "could not find alias in config. Verify with list-conf.");
+        }
+
+        pwallet->Lock();
+        return statusObj;
+
+    }
+
+    if (strCommand == "start-many") {
+        if (pwallet->IsLocked()) {
+            SecureString strWalletPass;
+            strWalletPass.reserve(100);
+
+            if (request.params.size() == 2) {
+                strWalletPass = request.params[1].get_str().c_str();
+            } else {
+                throw runtime_error(
+                        "Your wallet is locked, passphrase is required\n");
+            }
+
+            if (!pwallet->Unlock(strWalletPass)) {
+                return "incorrect passphrase";
+            }
+        }
+
+        std::vector<CMasternodeConfig::CMasternodeEntry> mnEntries;
+        mnEntries = masternodeConfig.getEntries();
+
+        int total = 0;
+        int successful = 0;
+        int fail = 0;
+
+        UniValue resultsObj(UniValue::VOBJ);
+
+        for (CMasternodeConfig::CMasternodeEntry mne : masternodeConfig.getEntries()) {
+            total++;
+
+            std::string errorMessage;
+            bool result =  activeMasternode.Register(g_connman.get(), mne.getIp(), mne.getPrivKey(), mne.getTxHash(), mne.getOutputIndex(), errorMessage);
+
+            UniValue statusObj(UniValue::VOBJ);
+            statusObj.pushKV("alias", mne.getAlias());
+            statusObj.pushKV("result", result ? "succesful" : "failed");
+
+            if (result) {
+                successful++;
+            } else {
+                fail++;
+                statusObj.pushKV("errorMessage", errorMessage);
+            }
+
+            resultsObj.pushKV("status", statusObj);
+        }
+        pwallet->Lock();
+
+        UniValue returnObj(UniValue::VOBJ);
+        returnObj.pushKV("overall", "Successfully started " + boost::lexical_cast<std::string>(successful) + " masternodes, failed to start " +
+                                    boost::lexical_cast<std::string>(fail) + ", total " + boost::lexical_cast<std::string>(total));
+        returnObj.pushKV("detail", resultsObj);
+
+        return returnObj;
+    }
+
+    if (strCommand == "debug") {
+        if (activeMasternode.status == MASTERNODE_REMOTELY_ENABLED) return "masternode started remotely";
+        if (activeMasternode.status == MASTERNODE_INPUT_TOO_NEW) return "masternode input must have at least 15 confirmations";
+        if (activeMasternode.status == MASTERNODE_IS_CAPABLE) return "successfully started masternode";
+        if (activeMasternode.status == MASTERNODE_STOPPED) return "masternode is stopped";
+        if (activeMasternode.status == MASTERNODE_NOT_CAPABLE) return "not capable masternode: " + activeMasternode.notCapableReason;
+        if (activeMasternode.status == MASTERNODE_SYNC_IN_PROCESS) return "sync in process. Must wait until client is synced to start.";
+
+        CTxIn vin = CTxIn();
+        CPubKey pubkey;
+        CKey key;
+        bool found = activeMasternode.GetMasterNodeVin(vin, pubkey, key);
+        if (!found) {
+            return "Missing masternode input, please look at the documentation for instructions on masternode creation";
+        } else {
+            return "No problems were found";
+        }
+    }
+
+    if (strCommand == "outputs"){
+        // Find possible candidates
+        vector<COutput> possibleCoins = activeMasternode.SelectCoinsMasternode();
+
+        UniValue obj(UniValue::VOBJ);
+        for (const auto& out : possibleCoins) {
+            obj.pushKV(out.tx->GetHash().ToString().c_str(), boost::lexical_cast<std::string>(out.i));
+        }
+        return obj;
+    }
+
+    if (strCommand == "create") {
+
+        return "Not implemented yet, please look at the documentation for instructions on masternode creation";
+    }
+
+    if (strCommand == "current") {
+        int winner = GetCurrentMasterNode(1);
+        if (winner >= 0) {
+            return vecMasternodes[winner].addr.ToString().c_str();
+        }
+
+        return "unknown";
+    }
+
+    if (strCommand == "genkey") {
+        CKey secret;
+        secret.MakeNewKey(false);
+
+        return EncodeSecret(secret);
+    }
+
+    if (strCommand == "winners") {
+        UniValue obj(UniValue::VOBJ);
+
+        for (int nHeight = chainActive.Height() - 10; nHeight < chainActive.Height() + 20; nHeight++) {
+            CScript payee;
+            if (masternodePayments.GetBlockPayee(nHeight, payee)) {
+                CTxDestination address1;
+                ExtractDestination(payee, address1);
+                CTxDestination address2(address1);
+                obj.pushKV(boost::lexical_cast<std::string>(nHeight), EncodeDestination(address2));
+            } else {
+                obj.pushKV(boost::lexical_cast<std::string>(nHeight), "");
+            }
+        }
+
+        return obj;
+    }
+
+    /*if (strCommand == "enforce") {
+        return (uint64_t) enforceMasternodePaymentsTime;
+    }*/
+
+    if (strCommand == "connect") {
+        std::string strAddress = "";
+        if (request.params.size() == 2) {
+            strAddress = request.params[1].get_str().c_str();
+        } else {
+            throw runtime_error(
+                    "Masternode address required\n");
+        }
+
+        CService addr = CService(strAddress);
+        std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+
+        std::vector<AddedNodeInfo> vInfo = g_connman->GetAddedNodeInfo();
+        for (const AddedNodeInfo& info : vInfo) {
+            if (!info.fConnected) {
+                const char *pszDest = info.strAddedNode.c_str();
+                if (g_connman->ConnectNode(CAddress(addr, NODE_NETWORK), pszDest, true, true)) {
+                    return "successfully connected";;
+                } else {
+                    return "error connecting";
+                }
+
+            }
+        }
+    }
+
+    if (strCommand == "list-conf") {
+        std::vector<CMasternodeConfig::CMasternodeEntry> mnEntries;
+        mnEntries = masternodeConfig.getEntries();
+
+        UniValue resultObj(UniValue::VOBJ);
+
+        for (CMasternodeConfig::CMasternodeEntry mne : masternodeConfig.getEntries()) {
+            UniValue mnObj(UniValue::VOBJ);
+            mnObj.pushKV("alias", mne.getAlias());
+            mnObj.pushKV("address", mne.getIp());
+            mnObj.pushKV("privateKey", mne.getPrivKey());
+            mnObj.pushKV("txHash", mne.getTxHash());
+            mnObj.pushKV("outputIndex", mne.getOutputIndex());
+            resultObj.pushKV("masternode", mnObj);
+        }
+
+        return resultObj;
+    }
+
+    if (strCommand == "outputs") {
+        // Find possible candidates
+        vector<COutput> possibleCoins = activeMasternode.SelectCoinsMasternode();
+
+        UniValue obj(UniValue::VOBJ);
+        for (COutput& out : possibleCoins) {
+            obj.pushKV(out.tx->GetHash().ToString().c_str(), boost::lexical_cast<std::string>(out.i));
+        }
+
+        return obj;
+
+    }
+    return NullUniValue;
+}
+
+UniValue callcontract(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 2)
+        throw runtime_error(
+                "callcontract \"address\" \"data\" ( address )\n"
+                "\nArgument:\n"
+                "1. \"address\"          (string, required) The account address\n"
+                "2. \"data\"             (string, required) The data hex string\n"
+                "3. address              (string, optional) The sender address hex string\n"
+                "4. gasLimit             (string, optional) The gas limit for executing the contract\n"
+        );
+
+    if (chainActive.Height() < Params().FirstSCBlock()) {
+        throw JSONRPCError(RPC_VERIFY_ERROR, "Smart contracts hardfork is not active yet. Activation block number - " + std::to_string(Params().FirstSCBlock()));
+    }
+
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    CWallet* const pwallet = wallet.get();
+
+    LOCK(cs_main);
+
+    std::string strAddr = request.params[0].get_str();
+    std::string data = request.params[1].get_str();
+
+
+    if(data.size() % 2 != 0 /*|| !regex_match(data, hexData)*/)
+        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid data (data not hex)");
+
+    if(strAddr.size() != 40 /*|| !regex_match(strAddr, hexData)*/)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Incorrect address");
+
+
+    dev::Address addrAccount(strAddr);
+    if(!globalState->addressInUse(addrAccount))
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address does not exist");
+
+    dev::Address senderAddress;
+    if(request.params.size() == 3){
+        CTxDestination luxSenderAddress = DecodeDestination(request.params[2].get_str());
+        if(IsValidDestination(luxSenderAddress)) {
+            CKeyID *keyid = boost::get<CKeyID>(&luxSenderAddress);
+            senderAddress = dev::Address(HexStr(valtype(keyid->begin(),keyid->end())));
+        }else{
+            senderAddress = dev::Address(request.params[2].get_str());
+        }
+
+    }
+    uint64_t gasLimit=0;
+    if(request.params.size() == 4){
+        gasLimit = request.params[3].get_int();
+    }
+
+
+    std::vector<ResultExecute> execResults = CallContract(addrAccount, ParseHex(data), senderAddress, gasLimit);
+
+    if(fRecordLogOpcodes){
+        writeVMlog(execResults);
+    }
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("address", strAddr);
+    result.pushKV("executionResult", executionResultToJSON(execResults[0].execRes));
+    result.pushKV("transactionReceipt", transactionReceiptToJSON(execResults[0].txRec));
+
+    return result;
+}
+
+UniValue createcontract(const JSONRPCRequest& request){
+
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    CWallet* const pwallet = wallet.get();
+
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp))
+        return NullUniValue;
+
+    LOCK2(cs_main, pwallet->cs_wallet);
+    LuxDGP luxDGP(globalState.get(), fGettingValuesDGP);
+    uint64_t blockGasLimit = luxDGP.getBlockGasLimit(chainActive.Height());
+    uint64_t minGasPrice = CAmount(luxDGP.getMinGasPrice(chainActive.Height()));
+    CAmount nGasPrice = (minGasPrice>DEFAULT_GAS_PRICE)?minGasPrice:DEFAULT_GAS_PRICE;
+
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 6)
+        throw runtime_error(
+                "createcontract \"bytecode\" (gaslimit gasprice \"senderaddress\" broadcast)"
+                "\nCreate a contract with bytcode.\n"
+                + HelpRequiringPassphrase(pwallet) +
+                "\nArguments:\n"
+                "1. \"bytecode\"  (string, required) contract bytcode.\n"
+                "2. gasLimit  (numeric or string, optional) gasLimit, default: "+i64tostr(DEFAULT_GAS_LIMIT_OP_CREATE)+", max: "+i64tostr(blockGasLimit)+"\n"
+                                                                                                                                                         "3. gasPrice  (numeric or string, optional) gasPrice LUX price per gas unit, default: "+FormatMoney(nGasPrice)+", min:"+FormatMoney(minGasPrice)+"\n"
+                                                                                                                                                                                                                                                                                                          "4. \"senderaddress\" (string, optional) The quantum address that will be used to create the contract.\n"
+                                                                                                                                                                                                                                                                                                          "5. \"broadcast\" (bool, optional, default=true) Whether to broadcast the transaction or not.\n"
+                                                                                                                                                                                                                                                                                                          "6. \"changeToSender\" (bool, optional, default=true) Return the change to the sender.\n"
+                                                                                                                                                                                                                                                                                                          "\nResult:\n"
+                                                                                                                                                                                                                                                                                                          "[\n"
+                                                                                                                                                                                                                                                                                                          "  {\n"
+                                                                                                                                                                                                                                                                                                          "    \"txid\" : (string) The transaction id.\n"
+                                                                                                                                                                                                                                                                                                          "    \"sender\" : (string) " + CURRENCY_UNIT + " address of the sender.\n"
+                                                                                                                                                                                                                                                                                                                                                         "    \"hash160\" : (string) ripemd-160 hash of the sender.\n"
+                                                                                                                                                                                                                                                                                                                                                         "    \"address\" : (string) expected contract address.\n"
+                                                                                                                                                                                                                                                                                                                                                         "  }\n"
+                                                                                                                                                                                                                                                                                                                                                         "]\n"
+                                                                                                                                                                                                                                                                                                                                                         "\nExamples:\n"
+                + HelpExampleCli("createcontract", "\"60606040525b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff02191690836c010000000000000000000000009081020402179055506103786001600050819055505b600c80605b6000396000f360606040526008565b600256\"")
+                + HelpExampleCli("createcontract", "\"60606040525b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff02191690836c010000000000000000000000009081020402179055506103786001600050819055505b600c80605b6000396000f360606040526008565b600256\" 6000000 "+FormatMoney(minGasPrice)+" \"LgAskSorXfCYUweZcCTpGNtpcFotS2rqDF\" true")
+        );
+
+    if (chainActive.Height() < Params().FirstSCBlock()) {
+        throw JSONRPCError(RPC_VERIFY_ERROR, "Smart contracts hardfork is not active yet. Activation block number - " + std::to_string(Params().FirstSCBlock()));
+    }
+
+    string bytecode = request.params[0].get_str();
+    string paramsone = request.params[1].get_str();
+    string paramstwo = request.params[2].get_str();
+
+    if(bytecode.size() % 2 != 0 || !CheckHex(bytecode))
+        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid data (data not hex)");
+
+    uint64_t nGasLimit=DEFAULT_GAS_LIMIT_OP_CREATE;
+
+    /*if (request.params.size() > 1) {
+        nGasLimit = request.params[1].get_int64();
+        if (nGasLimit > blockGasLimit)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasLimit (Maximum is: "+i64tostr(blockGasLimit)+")");
+        if (nGasLimit < MINIMUM_GAS_LIMIT)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasLimit (Minimum is: "+i64tostr(MINIMUM_GAS_LIMIT)+")");
+        if (nGasLimit <= 0)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasLimit");
+    }*/
+
+    if (request.params.size() > 2){
+        UniValue uGasPrice = request.params[2];
+        if(!ParseMoney(uGasPrice.getValStr(), nGasPrice))
+        {
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasPrice");
+        }
+        CAmount maxRpcGasPrice = gArgs.GetArg("-rpcmaxgasprice", MAX_RPC_GAS_PRICE);
+        if (nGasPrice > (int64_t)maxRpcGasPrice)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasPrice, Maximum allowed in RPC calls is: "+FormatMoney(maxRpcGasPrice)+" (use -rpcmaxgasprice to change it)");
+        if (nGasPrice < (int64_t)minGasPrice)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasPrice (Minimum is: "+FormatMoney(minGasPrice)+")");
+        if (nGasPrice <= 0)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasPrice");
+    }
+
+    bool fHasSender=false;
+    CTxDestination senderAddress;
+    if (request.params.size() > 3){
+        senderAddress = DecodeDestination(request.params[3].get_str());
+        if (!IsValidDestination(senderAddress))
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Nexalt address to send from");
+        else
+            fHasSender=true;
+    }
+
+    bool fBroadcast=true;
+    if (request.params.size() > 4){
+        fBroadcast=request.params[4].get_bool();
+    }
+
+    bool fChangeToSender=true;
+    if (request.params.size() > 5){
+        fChangeToSender=request.params[5].get_bool();
+    }
+
+    CCoinControl coinControl;
+
+    if(fHasSender){
+        //find a UTXO with sender address
+
+        UniValue results(UniValue::VARR);
+        vector<COutput> vecOutputs;
+
+        coinControl.fAllowOtherInputs=true;
+
+        assert(pwallet != NULL);
+
+        int nMinDepth = 1;
+        int nMaxDepth = 9999999;
+        std::set <CTxDestination> destinations;
+        bool include_unsafe = true;
+        CAmount nMinimumAmount = 0;
+        CAmount nMaximumAmount = MAX_MONEY;
+        CAmount nMinimumSumAmount = MAX_MONEY;
+        uint64_t nMaximumCount = 0;
+        {
+            LOCK2(cs_main, pwallet->cs_wallet);
+            auto locked_chain = pwallet->chain().lock();
+            pwallet->AvailableCoins(*locked_chain, vecOutputs, !include_unsafe, nullptr,
+                                   nMinimumAmount, nMaximumAmount,nMinimumSumAmount,
+                                   nMaximumCount, nMinDepth, nMaxDepth);
+        }
+
+
+        for (const COutput& out : vecOutputs) {
+            CTxDestination address;
+            const CScript& scriptPubKey = out.tx->tx->vout[out.i].scriptPubKey;
+            bool fValidAddress = ExtractDestination(scriptPubKey, address);
+
+            if (!fValidAddress || senderAddress != address)
+                continue;
+
+            coinControl.Select(COutPoint(out.tx->GetHash(),out.i));
+
+            break;
+
+        }
+
+        if(!coinControl.HasSelected()){
+            throw JSONRPCError(RPC_TYPE_ERROR, "Sender address does not have any unspent outputs");
+        }
+        if(fChangeToSender){
+            coinControl.destChange=senderAddress;
+        }
+    }
+    EnsureWalletIsUnlocked(pwallet);
+
+    CTransactionRef txRef;
+
+    CWalletTx wtx(pwallet,txRef) ;
+
+    wtx.nTimeSmart = GetAdjustedTime();
+
+    CAmount nGasFee=nGasPrice*nGasLimit;
+
+    CAmount curBalance = pwallet->GetBalance();
+
+
+    // Check amount
+    if (nGasFee <= 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
+
+    if (nGasFee > curBalance)
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
+
+
+    // Build OP_EXEC script
+    CScript scriptPubKey = CScript() << CScriptNum(VersionVM::GetEVMDefault().toRaw()) << CScriptNum(nGasLimit) << CScriptNum(nGasPrice) << ParseHex(bytecode) << OP_CREATE;
+
+    // Create and send the transaction
+    CReserveKey reservekey(pwallet);
+    CAmount nFeeRequired;
+    std::string strError;
+    int nChangePos = -1;
+    std::vector<CRecipient> vecSend;
+    CRecipient recipient = {scriptPubKey, 500000, false};
+    vecSend.push_back(recipient);
+
+    auto locked_chain = pwallet->chain().lock();
+
+    bool success = pwallet->CreateTransaction(*locked_chain, vecSend, wtx.tx, reservekey, nFeeRequired, nChangePos, strError,
+                                              coinControl/*,  ALL_COINS,false, (CAmount)0, nGasFee*/);
+
+    if (!success) {
+        if (nFeeRequired > pwallet->GetBalance())
+            strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+
+    CTxDestination txSenderDest;
+
+    const auto it = pwallet->mapWallet.find(wtx.tx->vin[0].prevout.hash);
+    if (it == pwallet->mapWallet.end()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, unknown transaction");
+    }
+    const CWalletTx& trans = it->second;
+
+
+    ExtractDestination(trans.tx->vout[wtx.tx->vin[0].prevout.n].scriptPubKey,txSenderDest);
+
+    if (fHasSender && !(senderAddress == txSenderDest)){
+        throw JSONRPCError(RPC_TYPE_ERROR, "Sender could not be set, transaction was not committed!");
+    }
+
+    UniValue result(UniValue::VOBJ);
+    if(fBroadcast){
+        CValidationState state;
+        if (!pwallet->CommitTransaction(wtx.tx,{},{}, reservekey, nullptr,state)) {
+            throw JSONRPCError(RPC_WALLET_ERROR,
+                               "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of the wallet and coins were spent in the copy but not marked as spent here.");
+        }
+        std::string txId=wtx.GetHash().GetHex();
+        result.pushKV("txid", txId);
+
+        CKeyID *keyid = boost::get<CKeyID>(&txSenderDest);
+
+        result.pushKV("sender", EncodeDestination(txSenderDest));
+        CScript scriptPubKeyToGethash = GetScriptForDestination(txSenderDest);
+        result.pushKV("hash160", HexStr(scriptPubKeyToGethash.begin(),scriptPubKeyToGethash.end()));
+        std::vector<unsigned char> SHA256TxVout(32);
+        vector<unsigned char> contractAddress(20);
+        vector<unsigned char> txIdAndVout(wtx.GetHash().begin(), wtx.GetHash().end());
+        uint32_t voutNumber=0;
+        for (const CTxOut& txout : wtx.tx->vout) {
+            if(txout.scriptPubKey.HasOpCreate()){
+                std::vector<unsigned char> voutNumberChrs;
+                if (voutNumberChrs.size() < sizeof(voutNumber))voutNumberChrs.resize(sizeof(voutNumber));
+                std::memcpy(voutNumberChrs.data(), &voutNumber, sizeof(voutNumber));
+                txIdAndVout.insert(txIdAndVout.end(),voutNumberChrs.begin(),voutNumberChrs.end());
+                break;
+            }
+            voutNumber++;
+        }
+        CSHA256().Write(txIdAndVout.data(), txIdAndVout.size()).Finalize(SHA256TxVout.data());
+        CRIPEMD160().Write(SHA256TxVout.data(), SHA256TxVout.size()).Finalize(contractAddress.data());
+        result.pushKV("address", HexStr(contractAddress));
+    }else{
+        string strHex = EncodeHexTx(static_cast<CTransaction>(*wtx.tx));
+        result.pushKV("raw transaction", strHex);
+    }
+    return result;
+}
+
+UniValue sendtocontract(const JSONRPCRequest& request){
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    CWallet* const pwallet = wallet.get();
+
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp))
+        return NullUniValue;
+
+    LOCK2(cs_main, pwallet->cs_wallet);
+    LuxDGP luxDGP(globalState.get(), fGettingValuesDGP);
+    uint64_t blockGasLimit = luxDGP.getBlockGasLimit(chainActive.Height());
+    uint64_t minGasPrice = CAmount(luxDGP.getMinGasPrice(chainActive.Height()));
+    CAmount nGasPrice = (minGasPrice>DEFAULT_GAS_PRICE)?minGasPrice:DEFAULT_GAS_PRICE;
+
+    if (request.fHelp || request.params.size() < 2 || request.params.size() > 8)
+        throw runtime_error(
+                "sendtocontract \"contractaddress\" \"data\" (amount gaslimit gasprice senderaddress broadcast)"
+                "\nSend funds and data to a contract.\n"
+                + HelpRequiringPassphrase(pwallet) +
+                "\nArguments:\n"
+                "1. \"contractaddress\" (string, required) The contract address that will receive the funds and data.\n"
+                "2. \"datahex\"  (string, required) data to send.\n"
+                "3. \"amount\"      (numeric or string, optional) The amount in " + CURRENCY_UNIT + " to send. eg 0.1, default: 0\n"
+                                                                                                    "4. gasLimit  (numeric or string, optional) gasLimit, default: "+i64tostr(DEFAULT_GAS_LIMIT_OP_SEND)+", max: "+i64tostr(blockGasLimit)+"\n"
+                                                                                                                                                                                                                                           "5. gasPrice  (numeric or string, optional) gasPrice Nexalt price per gas unit, default: "+FormatMoney(nGasPrice)+", min:"+FormatMoney(minGasPrice)+"\n"
+                                                                                                                                                                                                                                                                                                                                                                                            "6. \"senderaddress\" (string, optional) The quantum address that will be used as sender.\n"
+                                                                                                                                                                                                                                                                                                                                                                                            "7. \"broadcast\" (bool, optional, default=true) Whether to broadcast the transaction or not.\n"
+                                                                                                                                                                                                                                                                                                                                                                                            "8. \"changeToSender\" (bool, optional, default=true) Return the change to the sender.\n"
+                                                                                                                                                                                                                                                                                                                                                                                            "\nResult:\n"
+                                                                                                                                                                                                                                                                                                                                                                                            "[\n"
+                                                                                                                                                                                                                                                                                                                                                                                            "  {\n"
+                                                                                                                                                                                                                                                                                                                                                                                            "    \"txid\" : (string) The transaction id.\n"
+                                                                                                                                                                                                                                                                                                                                                                                            "    \"sender\" : (string) " + CURRENCY_UNIT + " address of the sender.\n"
+                                                                                                                                                                                                                                                                                                                                                                                                                                           "    \"hash160\" : (string) ripemd-160 hash of the sender.\n"
+                                                                                                                                                                                                                                                                                                                                                                                                                                           "  }\n"
+                                                                                                                                                                                                                                                                                                                                                                                                                                           "]\n"
+                                                                                                                                                                                                                                                                                                                                                                                                                                           "\nExamples:\n"
+                + HelpExampleCli("sendtocontract", "\"c6ca2697719d00446d4ea51f6fac8fd1e9310214\" \"54f6127f\"")
+                + HelpExampleCli("sendtocontract", "\"c6ca2697719d00446d4ea51f6fac8fd1e9310214\" \"54f6127f\" 12.0015 6000000 "+FormatMoney(minGasPrice)+" \"LgAskSorXfCYUweZcCTpGNtpcFotS2rqDF\"")
+        );
+
+    if (chainActive.Height() < Params().FirstSCBlock()) {
+        throw JSONRPCError(RPC_VERIFY_ERROR, "Smart contracts hardfork is not active yet. Activation block number - " + std::to_string(Params().FirstSCBlock()));
+    }
+
+    std::string contractaddress = request.params[0].get_str();
+    if(contractaddress.size() != 40 /*|| !regex_match(contractaddress, hexData)*/)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Incorrect contract address");
+
+    dev::Address addrAccount(contractaddress);
+    if(!globalState->addressInUse(addrAccount))
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "contract address does not exist");
+
+    string datahex = request.params[1].get_str();
+    if(datahex.size() % 2 != 0 /*|| !regex_match(datahex, hexData)*/)
+        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid data (data not hex)");
+
+    CAmount nAmount = 0;
+    if (request.params.size() > 2) {
+        UniValue uAmount = request.params[2];
+        if(!ParseMoney(uAmount.getValStr(), nAmount)) {
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for Amount");
+        }
+    }
+
+    uint64_t nGasLimit=DEFAULT_GAS_LIMIT_OP_SEND;
+    if (request.params.size() > 3){
+        nGasLimit = request.params[3].get_int64();
+        if (nGasLimit > blockGasLimit)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasLimit (Maximum is: "+i64tostr(blockGasLimit)+")");
+        if (nGasLimit < MINIMUM_GAS_LIMIT)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasLimit (Minimum is: "+i64tostr(MINIMUM_GAS_LIMIT)+")");
+        if (nGasLimit <= 0)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasLimit");
+    }
+
+    if (request.params.size() > 4){
+        UniValue uGasPrice = request.params[4];
+        if(!ParseMoney(uGasPrice.getValStr(), nGasPrice))
+        {
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasPrice");
+        }
+        CAmount maxRpcGasPrice = gArgs.GetArg("-rpcmaxgasprice", MAX_RPC_GAS_PRICE);
+        if (nGasPrice > (int64_t)maxRpcGasPrice)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasPrice, Maximum allowed in RPC calls is: "+FormatMoney(maxRpcGasPrice)+" (use -rpcmaxgasprice to change it)");
+        if (nGasPrice < (int64_t)minGasPrice)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasPrice (Minimum is: "+FormatMoney(minGasPrice)+")");
+        if (nGasPrice <= 0)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid value for gasPrice");
+    }
+
+    bool fHasSender=false;
+    CTxDestination senderAddress;
+    if (request.params.size() > 5){
+        senderAddress = DecodeDestination(request.params[5].get_str());
+        if (!IsValidDestination(senderAddress))
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Nexalt address to send from");
+        else
+            fHasSender=true;
+    }
+
+    bool fBroadcast=true;
+    if (request.params.size() > 6){
+        fBroadcast=request.params[6].get_bool();
+    }
+
+    bool fChangeToSender=true;
+    if (request.params.size() > 7){
+        fChangeToSender=request.params[7].get_bool();
+    }
+
+    CCoinControl coinControl;
+
+    if(fHasSender){
+
+        UniValue results(UniValue::VARR);
+        vector<COutput> vecOutputs;
+
+        coinControl.fAllowOtherInputs=true;
+
+        assert(pwallet != NULL);
+        //pwallet->AvailableCoins(vecOutputs, false, NULL, true);
+
+        int nMinDepth = 1;
+        int nMaxDepth = 9999999;
+        std::set <CTxDestination> destinations;
+        bool include_unsafe = true;
+        CAmount nMinimumAmount = 0;
+        CAmount nMaximumAmount = MAX_MONEY;
+        CAmount nMinimumSumAmount = MAX_MONEY;
+        uint64_t nMaximumCount = 0;
+        {
+            LOCK2(cs_main, pwallet->cs_wallet);
+            auto locked_chain = pwallet->chain().lock();
+            pwallet->AvailableCoins(*locked_chain, vecOutputs, !include_unsafe, nullptr,
+                                    nMinimumAmount, nMaximumAmount,nMinimumSumAmount,
+                                    nMaximumCount, nMinDepth, nMaxDepth);
+        }
+
+        for (const COutput& out : vecOutputs) {
+
+            CTxDestination address;
+            const CScript& scriptPubKey = out.tx->tx->vout[out.i].scriptPubKey;
+            bool fValidAddress = ExtractDestination(scriptPubKey, address);
+
+            if (!fValidAddress || senderAddress != address)
+                continue;
+
+            coinControl.Select(COutPoint(out.tx->GetHash(),out.i));
+
+            break;
+
+        }
+
+        if(!coinControl.HasSelected()){
+            throw JSONRPCError(RPC_TYPE_ERROR, "Sender address does not have any unspent outputs");
+        }
+        if(fChangeToSender){
+            coinControl.destChange=senderAddress;
+        }
+    }
+
+    EnsureWalletIsUnlocked(pwallet);
+
+    CTransactionRef txRef;
+
+    CWalletTx wtx(pwallet,txRef) ;
+
+    wtx.nTimeSmart = GetAdjustedTime();
+
+    CAmount nGasFee=nGasPrice*nGasLimit;
+
+    CAmount curBalance = pwallet->GetBalance();
+
+    // Check amount
+    if (nGasFee <= 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount for gas fee");
+
+    if (nAmount+nGasFee > curBalance)
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
+
+    // Build OP_EXEC_ASSIGN script
+    CScript scriptPubKey = CScript() << CScriptNum(VersionVM::GetEVMDefault().toRaw()) << CScriptNum(nGasLimit) << CScriptNum(nGasPrice) << ParseHex(datahex) << ParseHex(contractaddress) << OP_CALL;
+
+    // Create and send the transaction
+    CReserveKey reservekey(pwallet);
+    CAmount nFeeRequired;
+    std::string strError;
+    int nChangePos = -1;
+    std::vector<CRecipient> vecSend;
+//    int nChangePosRet = -1;
+    CRecipient recipient = {scriptPubKey, nAmount, false};
+    vecSend.push_back(recipient);
+    auto locked_chain = pwallet->chain().lock();
+
+    bool success = pwallet->CreateTransaction(*locked_chain, vecSend, wtx.tx, reservekey, nFeeRequired, nChangePos, strError, coinControl/*, ALL_COINS,
+                                        false, (CAmount)0, nGasFee*/);
+
+    if (!success) {
+        if (nFeeRequired > pwallet->GetBalance())
+            strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+
+    CTxDestination txSenderDest;
+    ExtractDestination(wtx.tx->vout[wtx.tx->vin[0].prevout.n].scriptPubKey,txSenderDest);
+    //ExtractDestination(pwallet->mapWallet[wtx.tx->vin[0].prevout.hash].tx->vout[wtx.tx->vin[0].prevout.n].scriptPubKey,txSenderDest);
+
+    if (fHasSender && !(senderAddress == txSenderDest)){
+        throw JSONRPCError(RPC_TYPE_ERROR, "Sender could not be set, transaction was not committed!");
+    }
+
+    UniValue result(UniValue::VOBJ);
+
+    if(fBroadcast){
+
+
+        CValidationState state;
+        if (!pwallet->CommitTransaction(wtx.tx, {}, {}, reservekey, nullptr, state))
+            throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of the wallet and coins were spent in the copy but not marked as spent here.");
+
+        std::string txId=wtx.GetHash().GetHex();
+        result.pushKV("txid", txId);
+
+        CKeyID *keyid = boost::get<CKeyID>(&txSenderDest);
+
+        result.pushKV("sender", EncodeDestination(txSenderDest));
+        result.pushKV("hash160", HexStr(valtype(keyid->begin(),keyid->end())));
+    }else{
+        string strHex = EncodeHexTx(static_cast<CTransaction>(*wtx.tx));
+        result.pushKV("raw transaction", strHex);
+    }
+
+    return result;
+}
+
 UniValue abortrescan(const JSONRPCRequest& request); // in rpcdump.cpp
 UniValue dumpprivkey(const JSONRPCRequest& request); // in rpcdump.cpp
 UniValue importprivkey(const JSONRPCRequest& request);
@@ -4237,6 +5332,10 @@ static const CRPCCommand commands[] =
     { "wallet",             "gettransaction",                   &gettransaction,                {"txid","include_watchonly"} },
     { "wallet",             "getunconfirmedbalance",            &getunconfirmedbalance,         {} },
     { "wallet",             "getwalletinfo",                    &getwalletinfo,                 {} },
+    { "wallet",             "masternode",                       &masternode,                    {"command"}},
+    { "wallet",             "callcontract",                     &callcontract,                  {"command"}},
+    { "wallet",             "sendtocontract",                   &sendtocontract,                {"command"}},
+    { "wallet",             "createcontract",                   &createcontract,                {"command"}},
     { "wallet",             "importaddress",                    &importaddress,                 {"address","label","rescan","p2sh"} },
     { "wallet",             "importmulti",                      &importmulti,                   {"requests","options"} },
     { "wallet",             "importprivkey",                    &importprivkey,                 {"privkey","label","rescan"} },

@@ -24,6 +24,7 @@
 #include <warnings.h>
 
 #include <univalue.h>
+#include "init.h"
 
 static UniValue getconnectioncount(const JSONRPCRequest& request)
 {
@@ -240,6 +241,7 @@ static UniValue addnode(const JSONRPCRequest& request)
     {
         CAddress addr;
         g_connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str(), false, false, true);
+        //g_connman->ConnectNode(addr,strNode.c_str(),false,true);
         return NullUniValue;
     }
 

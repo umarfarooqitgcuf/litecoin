@@ -504,6 +504,9 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
         // Fee
         nPayFee = model->wallet().getMinimumFee(nBytes, *coinControl(), nullptr /* returned_target */, nullptr /* reason */);
 
+        // IX Fee
+        //if (coinControl->useInstanTX) nPayFee = max(nPayFee, CENT);
+
         if (nPayAmount > 0)
         {
             nChange = nAmount - nPayAmount;

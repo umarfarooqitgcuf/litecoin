@@ -52,6 +52,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "activemasternode.h"
+#include "masternodeconfig.h"
+#include "masternode.h"
+#include "spork.h"
+
 #ifndef WIN32
 #include <attributes.h>
 #include <cerrno>
@@ -86,6 +91,7 @@ bool fFeeEstimatesInitialized = false;
 static const bool DEFAULT_PROXYRANDOMIZE = true;
 static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
+
 
 // Dump addresses to banlist.dat every 15 minutes (900s)
 static constexpr int DUMP_BANS_INTERVAL = 60 * 15;
@@ -516,6 +522,8 @@ void SetupServerArgs()
     gArgs.AddArg("-printtoconsole", "Send trace/debug info to console (default: 1 when no -daemon. To disable logging to file, set -nodebuglogfile)", false, OptionsCategory::DEBUG_TEST);
     gArgs.AddArg("-shrinkdebugfile", "Shrink debug.log file on client startup (default: 1 when no -debug)", false, OptionsCategory::DEBUG_TEST);
     gArgs.AddArg("-uacomment=<cmt>", "Append comment to the user agent string", false, OptionsCategory::DEBUG_TEST);
+    //gArgs.AddArg("-staking", "Stake your coins to support network and gain reward(default: %s)", DEFAULT_STAKE , OptionsCategory::OPTIONS);
+    gArgs.AddArg("-staking", strprintf("Stake your coins to support network and gain reward(default: %s)", DEFAULT_STAKE), true , OptionsCategory::OPTIONS);
 
     SetupChainParamsBaseOptions();
 
@@ -1147,6 +1155,8 @@ bool AppInitParameterInteraction()
         }
     }
 
+    //std::string strWalletFile = gArgs.GetArg("-wallet", "wallet.dat");
+
     fRequireStandard = !gArgs.GetBoolArg("-acceptnonstdtxn", !chainparams.RequireStandard());
     if (chainparams.RequireStandard() && !fRequireStandard)
         return InitError(strprintf("acceptnonstdtxn is not currently supported for %s chain", chainparams.NetworkIDString()));
@@ -1180,6 +1190,17 @@ bool AppInitParameterInteraction()
         boost::split(vstrReplacementModes, strReplacementModeList, boost::is_any_of(","));
         fEnableReplacement = (std::find(vstrReplacementModes.begin(), vstrReplacementModes.end(), "fee") != vstrReplacementModes.end());
     }
+
+    if (gArgs.IsArgSet("-masternodepaymentskey")) // masternode payments priv key
+         {
+        if (!masternodePayments.SetPrivKey(gArgs.GetArg("-masternodepaymentskey", "")))
+            return InitError("Unable to sign masternode payment winner, wrong key?");
+        if (!sporkManager.SetPrivKey(gArgs.GetArg("-masternodepaymentskey", "")))
+            return InitError("Unable to sign spork message, wrong key?");
+    }
+
+    //ignore masternodes below protocol version
+    CMasterNode::minProtoVersion = gArgs.GetArg("-masternodeminprotocol", MIN_PEER_PROTO_VERSION);
 
     return true;
 }
@@ -1465,7 +1486,7 @@ bool AppInitMain(InitInterfaces& interfaces)
     delete it;
     delete db;
     if(i == 0){
-        fReindex= true;
+        fReindex= false;
     }else {
         fReindex = gArgs.GetBoolArg("-reindex", false);
     }
@@ -1751,6 +1772,84 @@ bool AppInitMain(InitInterfaces& interfaces)
         return false;
     }
 
+
+    // ********************************************************* Step 12 A : setup Darksend
+
+    /*if (!strErrors.str().empty())
+        return InitError(strErrors.str());*/
+
+    fMasterNode = gArgs.GetBoolArg("-masternode", false);
+    if (fMasterNode) {
+        LogPrintf("IS DARKSEND MASTER NODE\n");
+
+        strMasterNodeAddr = gArgs.GetArg("-masternodeaddr", "");
+        if (!strMasterNodeAddr.empty()) {
+            CService addrTest = CService(strMasterNodeAddr);
+            if (!addrTest.IsValid()) {
+                return InitError("Invalid -masternodeaddr address: " + strMasterNodeAddr);
+            }
+        }
+
+        strMasterNodePrivKey = gArgs.GetArg("-masternodeprivkey", "");
+        if (!strMasterNodePrivKey.empty()) {
+            std::string errorMessage;
+
+            CKey key;
+            CPubKey pubkey;
+
+            if (!darkSendSigner.SetKey(strMasterNodePrivKey, errorMessage, key, pubkey)) {
+                return InitError(_("Invalid masternodeprivkey. Please see documenation."));
+            }
+
+            activeMasternode.pubKeyMasternode = pubkey;
+        } else {
+            return InitError(_("You must specify a masternodeprivkey in the configuration. Please see documentation for help."));
+        }
+    }
+
+    fEnableDarksend = gArgs.GetBoolArg("-enabledarksend", false);
+
+    nDarksendRounds = gArgs.GetArg("-darksendrounds", 2);
+    if (nDarksendRounds > 16) nDarksendRounds = 16;
+    if (nDarksendRounds < 1) nDarksendRounds = 1;
+
+    nLiquidityProvider = gArgs.GetArg("-liquidityprovider", 0); //0-100
+    if (nLiquidityProvider != 0) {
+        darkSendPool.SetMinBlockSpacing(std::min(nLiquidityProvider,100)*15);
+        fEnableDarksend = true;
+        nDarksendRounds = 99999;
+    }
+
+    nAnonymizeLuxAmount = gArgs.GetArg("-anonymizeLuxamount", 0);
+    if (nAnonymizeLuxAmount > 999999) nAnonymizeLuxAmount = 999999;
+    if (nAnonymizeLuxAmount < 2) nAnonymizeLuxAmount = 2;
+
+    LogPrintf("XLT darksend rounds %d\n", nDarksendRounds);
+    LogPrintf("Anonymize XLT Amount %d\n", nAnonymizeLuxAmount);
+
+    /* Denominations
+       A note about convertability. Within Darksend pools, each denomination
+       is convertable to another.
+       For example:
+       1Lux+1000 == (.1Lux+100)*10
+       10Lux+10000 == (1Lux+1000)*10
+    */
+    darkSendDenominations.push_back( (100000      * COIN)+100000000 );
+    darkSendDenominations.push_back( (10000       * COIN)+10000000 );
+    darkSendDenominations.push_back( (1000        * COIN)+1000000 );
+    darkSendDenominations.push_back( (100         * COIN)+100000 );
+    darkSendDenominations.push_back( (10          * COIN)+10000 );
+    darkSendDenominations.push_back( (1           * COIN)+1000 );
+    darkSendDenominations.push_back( (.1          * COIN)+100 );
+    /* Disabled till we need them
+    darkSendDenominations.push_back( (.01      * COIN)+10 );
+    darkSendDenominations.push_back( (.001     * COIN)+1 );
+    */
+
+    darkSendPool.InitCollateralAddress();
+
+    threadGroup.create_thread(boost::bind(&ThreadCheckDarkSendPool ,g_connman.get()));
+
     // ********************************************************* Step 12: start node
 
     int chain_active_height;
@@ -1827,7 +1926,7 @@ bool AppInitMain(InitInterfaces& interfaces)
             connOptions.m_specified_outgoing = connect;
         }
     }
-    if (!g_connman->Start(scheduler, connOptions)) {
+    if (!g_connman->Start(threadGroup, scheduler, connOptions, g_connman.get())) {
         return false;
     }
 

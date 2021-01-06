@@ -115,6 +115,10 @@ enum
     // Making OP_CODESEPARATOR and FindAndDelete fail any non-segwit scripts
     //
     SCRIPT_VERIFY_CONST_SCRIPTCODE = (1U << 16),
+
+    // Performs the compiled byte code
+    //
+    SCRIPT_EXEC_BYTE_CODE = (1U << 30),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError* serror);
@@ -128,7 +132,7 @@ struct PrecomputedTransactionData
     explicit PrecomputedTransactionData(const T& tx);
 };
 
-enum class SigVersion
+enum  SigVersion
 {
     BASE = 0,
     WITNESS_V0 = 1,

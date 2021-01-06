@@ -146,6 +146,19 @@ public:
         return cachedMinimumSizeHint;
     }
 
+    CAmount minimum() const
+    {
+        CAmount minAmount = 0.00000001*COIN;
+        return minAmount;
+    }
+
+    void setMinimum(const CAmount& min)
+    {
+        CAmount minAmount = 0.00000001*COIN;
+        minAmount = min;
+        Q_EMIT valueChanged();
+    }
+
 private:
     int currentUnit{BitcoinUnits::BTC};
     CAmount singleStep{CAmount(100000)}; // satoshis

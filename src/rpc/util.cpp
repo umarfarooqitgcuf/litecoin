@@ -10,8 +10,20 @@
 #include <tinyformat.h>
 #include <util/strencodings.h>
 #include <validation.h>
+#include <regex>
+
+//#include <boost/algorithm/string/case_conv.hpp> // for to_lower()
+//#include <boost/algorithm/string/join.hpp>
+//#include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
+//#include <boost/filesystem.hpp>
+//#include <boost/filesystem/fstream.hpp>
+//#include <boost/program_options/detail/config_file.hpp>
+//#include <boost/program_options/parsers.hpp>
+//#include <boost/thread.hpp>
 
 InitInterfaces* g_rpc_interfaces = nullptr;
+
+//regex hexData("^([0-9a-fA-f]{2,}$)");
 
 // Converts a hex string to a public key if possible
 CPubKey HexToPubKey(const std::string& hex_in)
@@ -556,4 +568,12 @@ std::pair<int64_t, int64_t> ParseRange(const UniValue& value)
         return {low, high};
     }
     throw JSONRPCError(RPC_INVALID_PARAMETER, "Range must be specified as end or as [begin,end]");
+}
+
+bool CheckHex(const std::string& str) {
+    size_t data=0;
+    if(str.size() > 2 && (str.compare(0, 2, "0x") == 0 || str.compare(0, 2, "0X") == 0)){
+        data=2;
+    }
+    return str.size() > data && str.find_first_not_of("0123456789abcdefABCDEF", data) == std::string::npos;
 }

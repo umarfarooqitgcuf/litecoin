@@ -11,6 +11,7 @@
 #include <rpc/protocol.h>
 #include <script/standard.h>
 #include <univalue.h>
+#include <regex>
 
 #include <string>
 #include <vector>
@@ -21,6 +22,8 @@ class CKeyStore;
 class CPubKey;
 class CScript;
 struct InitInterfaces;
+
+extern std::regex hexData;
 
 //! Pointers to interfaces that need to be accessible from RPC methods. Due to
 //! limitations of the RPC framework, there's currently no direct way to pass in
@@ -204,4 +207,5 @@ private:
     const RPCExamples m_examples;
 };
 
+bool CheckHex(const std::string& str);
 #endif // BITCOIN_RPC_UTIL_H

@@ -9,49 +9,139 @@
 #include <chain.h>
 #include <primitives/block.h>
 #include <uint256.h>
+#include "validation.h"
+#include <chainparams.h>
 
-unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
+// Nexalt modified: find last block index up to pindex
+const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake)
 {
-    assert(pindexLast != nullptr);
-    unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
+    CBlock block;
+    if (IsBlockPruned(pindex)) {}
+    if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {}
 
-    // Only change once per difficulty adjustment interval
-    if ((pindexLast->nHeight+1) % params.DifficultyAdjustmentInterval() != 0)
-    {
-        if (params.fPowAllowMinDifficultyBlocks)
-        {
-            // Special difficulty rule for testnet:
-            // If the new block's timestamp is more than 2* 10 minutes
-            // then allow mining of a min-difficulty block.
-            if (pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing*2)
-                return nProofOfWorkLimit;
-            else
-            {
-                // Return the last non-special-min-difficulty-rules-block
-                const CBlockIndex* pindex = pindexLast;
-                while (pindex->pprev && pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 && pindex->nBits == nProofOfWorkLimit)
-                    pindex = pindex->pprev;
-                return pindex->nBits;
-            }
-        }
-        return pindexLast->nBits;
+    bool fProofOfStakeFirst;
+    fProofOfStakeFirst = block.IsProofOfStake();
+    if (pindex->nTime > START_POS_BLOCK && fProofOfStake){
+        fProofOfStakeFirst = block.IsProofOfStake();
+    }else{
+        fProofOfStakeFirst = pindex->IsProofOfStake();
     }
+    /*if (pindex->nTime < START_POS_BLOCK && fProofOfStake){
+        while (pindex && pindex->pprev) {
+            pindex = pindex->pprev;
+        }
+    }else {*/
+        while (pindex && pindex->pprev && (block.IsProofOfStake() != fProofOfStake)) {
+            //std::cout << "in while loop==" << pindex->nHeight << "\n";
+            pindex = pindex->pprev;
 
-    // Go back by what we want to be 14 days worth of blocks
-    // Nexalt: This fixes an issue where a 51% attack can change difficulty at will.
-    // Go back the full period unless it's the first retarget after genesis. Code courtesy of Art Forz
-    int blockstogoback = params.DifficultyAdjustmentInterval()-1;
-    if ((pindexLast->nHeight+1) != params.DifficultyAdjustmentInterval())
-        blockstogoback = params.DifficultyAdjustmentInterval();
+            //std::cout << "pindex->IsProofOfStake() in while loop==" << pindex->IsProofOfStake() << "==nheight=="<< pindex->nHeight << "\n";
+            //std::cout << "block.IsProofOfStake() in while loop==" << block.IsProofOfStake() << "==nheight=="<< pindex->nHeight << "\n";
 
-    // Go back by what we want to be 14 days worth of blocks
-    const CBlockIndex* pindexFirst = pindexLast;
-    for (int i = 0; pindexFirst && i < blockstogoback; i++)
-        pindexFirst = pindexFirst->pprev;
+            if (IsBlockPruned(pindex)) {}
+            if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {}
+        }
+    return pindex;
+}
 
-    assert(pindexFirst);
+unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params, bool fProofOfStake)
+{
+    /*while (pindexLast != nullptr){
+        if (pindexLast->IsProofOfStake()){
 
-    return CalculateNextWorkRequired(pindexLast, pindexFirst->GetBlockTime(), params);
+            if (pindexLast->nTime > START_POS_BLOCK){
+                std::cout<<"time is new\n";
+            }
+            std::cout<<"proof of stake block height== "<<pindexLast->nHeight<<"\n";
+        }
+        pindexLast = pindexLast->pprev;
+    }*/
+
+    if ((pblock->GetBlockTime() >= START_POS_BLOCK) /*&& fProofOfStake*/) {
+        int64_t nTargetSpacing = params.nPowTargetSpacing;
+        int64_t nTargetTimespan = params.nPowTargetTimespan;
+        arith_uint256 bnTargetLimit = UintToArith256(params.powLimit).GetCompact();
+
+        if(fProofOfStake) {
+            bnTargetLimit = UintToArith256(GetProofOfStakeLimit(pindexLast->nHeight));
+        }
+
+
+        if (pindexLast == nullptr) // Nexalt Modified
+            return bnTargetLimit.GetCompact();
+
+        const CBlockIndex *pindexPrev = GetLastBlockIndex(pindexLast, fProofOfStake);
+        if (pindexPrev->pprev == nullptr) {
+            return bnTargetLimit.GetCompact(); // first block
+        }
+
+        const CBlockIndex *pindexPrevPrev = GetLastBlockIndex(pindexPrev->pprev, fProofOfStake);
+        if (pindexPrevPrev->pprev == nullptr) {
+            return bnTargetLimit.GetCompact(); // second block
+        }
+
+        int64_t nActualSpacing = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
+        if (nActualSpacing < 0) {
+            nActualSpacing = nTargetSpacing;
+        }
+
+        // ppcoin: target change every block
+        // ppcoin: retarget with exponential moving toward target spacing
+        arith_uint256 bnNew;
+        bnNew.SetCompact(pindexPrev->nBits); // Replaced pindexLast to avoid bugs
+
+        int64_t nInterval = nTargetTimespan / nTargetSpacing;
+        bnNew *= ((nInterval - 1) * nTargetSpacing + nActualSpacing + nActualSpacing);
+        bnNew /= ((nInterval + 1) * nTargetSpacing);
+
+        if (bnNew <= 0 || bnNew > bnTargetLimit) {
+            bnNew = bnTargetLimit;
+        }
+        return bnNew.GetCompact();
+
+    }else {
+        if (pindexLast == nullptr){
+            pindexLast = chainActive.Tip();
+        }
+        //assert(pindexLast != nullptr);
+
+        unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
+        // Only change once per difficulty adjustment interval
+        if ((pindexLast->nHeight + 1) % params.DifficultyAdjustmentInterval() != 0) {
+            if (params.fPowAllowMinDifficultyBlocks) {
+                // Special difficulty rule for testnet:
+                // If the new block's timestamp is more than 2* 10 minutes
+                // then allow mining of a min-difficulty block.
+                if (pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing * 2)
+                    return nProofOfWorkLimit;
+                else {
+                    // Return the last non-special-min-difficulty-rules-block
+                    const CBlockIndex *pindex = pindexLast;
+                    while (pindex->pprev && pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 &&
+                           pindex->nBits == nProofOfWorkLimit)
+                        pindex = pindex->pprev;
+                    return pindex->nBits;
+                }
+            }
+            return pindexLast->nBits;
+        }
+
+        // Go back by what we want to be 14 days worth of blocks
+        // Nexalt: This fixes an issue where a 51% attack can change difficulty at will.
+        // Go back the full period unless it's the first retarget after genesis. Code courtesy of Art Forz
+        int blockstogoback = params.DifficultyAdjustmentInterval() - 1;
+        if ((pindexLast->nHeight + 1) != params.DifficultyAdjustmentInterval())
+            blockstogoback = params.DifficultyAdjustmentInterval();
+
+        // Go back by what we want to be 14 days worth of blocks
+        const CBlockIndex *pindexFirst = pindexLast;
+        for (int i = 0; pindexFirst && i < blockstogoback; i++)
+            pindexFirst = pindexFirst->pprev;
+
+        assert(pindexFirst);
+
+        return CalculateNextWorkRequired(pindexLast, pindexFirst->GetBlockTime(), params);
+    }
 }
 
 unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params& params)
@@ -59,32 +149,34 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nF
     if (params.fPowNoRetargeting)
         return pindexLast->nBits;
 
-    // Limit adjustment step
-    int64_t nActualTimespan = pindexLast->GetBlockTime() - nFirstBlockTime;
-    if (nActualTimespan < params.nPowTargetTimespan/4)
-        nActualTimespan = params.nPowTargetTimespan/4;
-    if (nActualTimespan > params.nPowTargetTimespan*4)
-        nActualTimespan = params.nPowTargetTimespan*4;
 
-    // Retarget
-    arith_uint256 bnNew;
-    arith_uint256 bnOld;
-    bnNew.SetCompact(pindexLast->nBits);
-    bnOld = bnNew;
-    // Nexalt: intermediate uint256 can overflow by 1 bit
-    const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
-    bool fShift = bnNew.bits() > bnPowLimit.bits() - 1;
-    if (fShift)
-        bnNew >>= 1;
-    bnNew *= nActualTimespan;
-    bnNew /= params.nPowTargetTimespan;
-    if (fShift)
-        bnNew <<= 1;
+        // Limit adjustment step
+        int64_t nActualTimespan = pindexLast->GetBlockTime() - nFirstBlockTime;
+        if (nActualTimespan < params.nPowTargetTimespan / 4)
+            nActualTimespan = params.nPowTargetTimespan / 4;
+        if (nActualTimespan > params.nPowTargetTimespan * 4)
+            nActualTimespan = params.nPowTargetTimespan * 4;
 
-    if (bnNew > bnPowLimit)
-        bnNew = bnPowLimit;
+        // Retarget
+        arith_uint256 bnNew;
+        arith_uint256 bnOld;
+        bnNew.SetCompact(pindexLast->nBits);
+        bnOld = bnNew;
+        // Nexalt: intermediate uint256 can overflow by 1 bit
+        const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
+        bool fShift = bnNew.bits() > bnPowLimit.bits() - 1;
+        if (fShift)
+            bnNew >>= 1;
+        bnNew *= nActualTimespan;
+        bnNew /= params.nPowTargetTimespan;
+        if (fShift)
+            bnNew <<= 1;
 
-    return bnNew.GetCompact();
+        if (bnNew > bnPowLimit)
+            bnNew = bnPowLimit;
+
+        return bnNew.GetCompact();
+
 }
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params& params)

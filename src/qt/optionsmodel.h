@@ -49,6 +49,8 @@ public:
         ThirdPartyTxUrls,       // QString
         Language,               // QString
         CoinControlFeatures,    // bool
+        ShowMasternodesTab,      // bool
+        ParallelMasternodes,     // bool
         ThreadsScriptVerif,     // int
         Prune,                  // bool
         PruneSize,              // int
@@ -76,6 +78,9 @@ public:
     bool getProxySettings(QNetworkProxy& proxy) const;
     bool getCoinControlFeatures() const { return fCoinControlFeatures; }
     const QString& getOverriddenByCommandLine() { return strOverriddenByCommandLine; }
+    bool getShowMasternodesTab() { return fShowMasternodesTab; }
+    bool getParallelMasternodes() { return fParallelMasternodes; }
+
 
     /* Restart flag helper */
     void setRestartRequired(bool fRequired);
@@ -95,6 +100,8 @@ private:
     bool fCoinControlFeatures;
     /* settings that were overridden by command-line */
     QString strOverriddenByCommandLine;
+    bool fShowMasternodesTab;
+    bool fParallelMasternodes;
 
     // Add option to list of GUI options overridden through command line/config file
     void addOverriddenOption(const std::string &option);
@@ -105,6 +112,8 @@ Q_SIGNALS:
     void displayUnitChanged(int unit);
     void coinControlFeaturesChanged(bool);
     void hideTrayIconChanged(bool);
+    void showMasternodesTabChanged(bool);
+    void parallelMasternodesChanged(bool);
 };
 
 #endif // BITCOIN_QT_OPTIONSMODEL_H

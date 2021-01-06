@@ -36,6 +36,37 @@
 
 #include <boost/thread/condition_variable.hpp> // for boost::thread_interrupted
 
+//Nexalt only features
+extern std::atomic<bool> hideLogMessage;
+extern int nLogFile;
+extern bool fMasterNode;
+extern bool fDarkSendMaster ;
+extern bool fEnableInstanTX;
+extern int nInstanTXDepth;
+extern int nDarksendRounds;
+extern int nWalletBackups;
+extern int nAnonymizeLuxAmount;
+extern int nLiquidityProvider;
+extern bool fEnableDarksend;
+extern int64_t enforceMasternodePaymentsTime;
+extern std::string strMasterNodeAddr;
+extern int keysLoaded;
+extern bool fSucessfullyLoaded;
+extern std::vector<int64_t> darkSendDenominations;
+extern std::string strBudgetMode;
+
+extern std::map<std::string, std::string> mapArgs;
+extern std::map<std::string, std::vector<std::string> > mapMultiArgs;
+extern bool fDebug;
+extern bool fDebugMnSecurity;
+extern bool fPrintToConsole;
+extern bool fPrintToDebugLog;
+extern bool fServer;
+extern std::string strMiscWarning;
+extern bool fLogTimestamps;
+extern bool fLogIPs;
+extern volatile bool fReopenDebugLog;
+
 // Application startup time (used for uptime calculation)
 int64_t GetStartupTime();
 
@@ -85,6 +116,7 @@ const fs::path &GetBlocksDir();
 const fs::path &GetDataDir(bool fNetSpecific = true);
 void ClearDatadirCache();
 fs::path GetConfigFile(const std::string& confPath);
+fs::path GetMasternodeConfigFile();
 #ifdef WIN32
 fs::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 #endif
@@ -317,6 +349,7 @@ std::string HelpMessageOpt(const std::string& option, const std::string& message
  */
 int GetNumCores();
 
+void SetThreadPriority(int nPriority);
 void RenameThread(const char* name);
 
 /**

@@ -2418,7 +2418,6 @@ static UniValue addmlckeyraw(const JSONRPCRequest &request) {
 
         if (fValidAddress) {
             mlcAddress = EncodeDestination(address);
-            //std::cout<<"address in unspent list=="<<EncodeDestination(address)<<"\n";
         }
         amountdeduct = out.tx->tx->vout[out.i].nValue - 2680;
 
@@ -2435,7 +2434,6 @@ static UniValue addmlckeyraw(const JSONRPCRequest &request) {
         }
     }
 
-    //std::cout<<"voutuspent== "<<voutunspent<<"\n";
 
     //creating raw transaction
     CMutableTransaction rawTx;
@@ -2454,7 +2452,6 @@ static UniValue addmlckeyraw(const JSONRPCRequest &request) {
     pwallet->LearnRelatedScripts(newKey, output_type);
     CTxDestination dest = GetDestinationForKey(newKey, output_type);
     std::string key = EncodeDestination(dest);
-    //std::cout<<"this is my key="<<key<<"\n";
 
     //storing key and value in raw transaction
     for (int i = 0; i < 2; i++) {
@@ -2610,6 +2607,62 @@ static UniValue addmlckeyraw(const JSONRPCRequest &request) {
     return hashTx.GetHex();
 }
 
+static UniValue getsponsorkey(const JSONRPCRequest &request) {
+    if (request.fHelp) {
+        throw std::runtime_error(
+                RPCHelpMan{"getsponsorkey",
+                           "\nchecks that MLC key added or not\n"
+                           "throws an error if key is not added\n",
+                           {
+
+                           },
+                           RPCResult{
+                                   "\"SponsorKey\"         (string) Sponser key\n"
+                           },
+                           RPCExamples{""},
+                }.ToString()
+        );
+    }
+    static const std::string WALLET_ENDPOINT_BASE = "/wallet/";
+    std::string wallet_name;
+    if (request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) == WALLET_ENDPOINT_BASE) {
+        wallet_name = urlDecode(request.URI.substr(WALLET_ENDPOINT_BASE.size()));
+    }
+    std::string std_data_dir = GetDataDir().string();
+    leveldb::DB *db_my;
+    leveldb::Options options_my;
+    options_my.create_if_missing = true;
+    std::string valueToCheck = "";
+    std::string value = "";
+    if(wallet_name == ""){
+        //default wallet
+        leveldb::Status status_my = leveldb::DB::Open(options_my, std_data_dir + "/myKey", &db_my);
+        std::string StringKeyToShow = "StringKeyToShow";
+        std::string StringKey = "StringKey";
+        if (status_my.ok()) status_my = db_my->Get(leveldb::ReadOptions(), StringKeyToShow, &valueToCheck);
+        if (status_my.ok()) status_my = db_my->Get(leveldb::ReadOptions(), StringKey, &value);
+        delete db_my;
+        if(valueToCheck != "" && value !=""){
+            return valueToCheck;
+            //throw JSONRPCError(RPC_WALLET_ERROR, strprintf("you have already added the key: %s", valueToCheck));
+        }else{
+            throw JSONRPCError(RPC_WALLET_ERROR, strprintf("you have not added the key yet!"));
+        }
+    }else{
+        leveldb::Status status_my = leveldb::DB::Open(options_my, std_data_dir + "/myKey", &db_my);
+        std::string StringKeyToShow = wallet_name +"_show";
+        std::string StringKey = wallet_name;
+        if (status_my.ok()) status_my = db_my->Get(leveldb::ReadOptions(), StringKeyToShow, &valueToCheck);
+        if (status_my.ok()) status_my = db_my->Get(leveldb::ReadOptions(), StringKey, &value);
+        delete db_my;
+
+        if(valueToCheck != "" && value !=""){
+            return valueToCheck;
+        }else{
+            throw JSONRPCError(RPC_WALLET_ERROR, strprintf("you have not added the key yet!"));
+        }
+    }
+}
 // clang-format off
 static const CRPCCommand commands[] =
 { //  category              name                            actor (function)            argNames
@@ -2632,6 +2685,7 @@ static const CRPCCommand commands[] =
     { "rawtransactions",    "joinpsbts",                    &joinpsbts,                 {"txs"} },
     { "rawtransactions",    "analyzepsbt",                  &analyzepsbt,               {"psbt"} },
     {"rawtransactions",     "addmlckeyraw",                 &addmlckeyraw,              {"txid",      "verbose",       "blockhash"}},
+    {"rawtransactions",     "getsponsorkey",                &getsponsorkey,             {}},
 
     { "blockchain",         "gettxoutproof",                &gettxoutproof,             {"txids", "blockhash"} },
     { "blockchain",         "verifytxoutproof",             &verifytxoutproof,          {"proof"} },

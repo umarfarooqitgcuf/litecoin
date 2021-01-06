@@ -70,6 +70,20 @@
 
 #include <thread>
 
+bool fMasterNode = false;
+bool fDarkSendMaster = true;
+std::string strMasterNodeAddr = "";
+std::string strMasterNodePrivKey = "";
+bool fDebug = false;
+int nAnonymizeLuxAmount = 1000;
+int nInstanTXDepth = 5;
+int nDarksendRounds = 2;
+int nWalletBackups = 10;
+bool fEnableDarksend = false;
+int nLiquidityProvider = 0;
+bool fDebugMnSecurity = false;
+std::vector<int64_t> darkSendDenominations;
+
 // Application startup time (used for uptime calculation)
 const int64_t nStartupTime = GetTime();
 
@@ -783,6 +797,13 @@ fs::path GetConfigFile(const std::string& confPath)
     return AbsPathForConfigVal(fs::path(confPath), false);
 }
 
+fs::path GetMasternodeConfigFile()
+{
+    fs::path pathConfigFile(gArgs.GetArg("-mnconf", "masternode.conf"));
+    if (!pathConfigFile.is_complete()) pathConfigFile = GetDataDir() / pathConfigFile;
+    return pathConfigFile;
+}
+
 static std::string TrimString(const std::string& str, const std::string& pattern)
 {
     std::string::size_type front = str.find_first_not_of(pattern);
@@ -1148,6 +1169,19 @@ void RenameThread(const char* name)
     // Prevent warnings for unused parameters...
     (void)name;
 #endif
+}
+
+void SetThreadPriority(int nPriority)
+{
+#ifdef WIN32
+    SetThreadPriority(GetCurrentThread(), nPriority);
+#else // WIN32
+#ifdef PRIO_THREAD
+    setpriority(PRIO_THREAD, 0, nPriority);
+#else  // PRIO_THREAD
+    setpriority(PRIO_PROCESS, 0, nPriority);
+#endif // PRIO_THREAD
+#endif // WIN32
 }
 
 void SetupEnvironment()

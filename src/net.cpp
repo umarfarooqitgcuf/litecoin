@@ -20,6 +20,12 @@
 #include <scheduler.h>
 #include <ui_interface.h>
 #include <util/strencodings.h>
+#include <netmessagemaker.h>
+#include "stake.h"
+#include "miner.h"
+#include "wallet/wallet.h"
+#include "core_io.h"
+#include <stake.h>
 
 #ifdef WIN32
 #include <string.h>
@@ -41,6 +47,7 @@
 #include <unordered_map>
 
 #include <math.h>
+#include "darksend.h"
 
 // Dump addresses to peers.dat every 15 minutes (900s)
 static constexpr int DUMP_PEERS_INTERVAL = 15 * 60;
@@ -350,18 +357,20 @@ static CAddress GetBindAddress(SOCKET sock)
     return addr_bind;
 }
 
-CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure, bool manual_connection)
+CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure, bool manual_connection,bool darkSendMaster)
 {
     if (pszDest == nullptr) {
-        if (IsLocal(addrConnect))
+        if (IsLocal(addrConnect) && !darkSendMaster)
             return nullptr;
 
         // Look for an existing connection
         CNode* pnode = FindNode(static_cast<CService>(addrConnect));
         if (pnode)
         {
+            pnode->fDarkSendMaster = darkSendMaster;
+
             LogPrintf("Failed to open new connection, already connected\n");
-            return nullptr;
+            return pnode;
         }
     }
 
@@ -388,6 +397,7 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
             CNode* pnode = FindNode(static_cast<CService>(addrConnect));
             if (pnode)
             {
+                pnode->fDarkSendMaster = darkSendMaster;
                 pnode->MaybeSetAddrName(std::string(pszDest));
                 LogPrintf("Failed to open new connection, already connected\n");
                 return nullptr;
@@ -440,7 +450,9 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
     NodeId id = GetNewNodeId();
     uint64_t nonce = GetDeterministicRandomizer(RANDOMIZER_ID_LOCALHOSTNONCE).Write(id).Finalize();
     CAddress addr_bind = GetBindAddress(hSocket);
-    CNode* pnode = new CNode(id, nLocalServices, GetBestHeight(), hSocket, addrConnect, CalculateKeyedNetGroup(addrConnect), nonce, addr_bind, pszDest ? pszDest : "", false);
+    CNode* pnode = new CNode(id, nLocalServices, GetBestHeight(), hSocket, addrConnect,
+                             CalculateKeyedNetGroup(addrConnect), nonce, addr_bind, pszDest ? pszDest : "", false);
+    if (darkSendMaster) pnode->fDarkSendMaster = true;
     pnode->AddRef();
 
     return pnode;
@@ -960,7 +972,8 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
     uint64_t nonce = GetDeterministicRandomizer(RANDOMIZER_ID_LOCALHOSTNONCE).Write(id).Finalize();
     CAddress addr_bind = GetBindAddress(hSocket);
 
-    CNode* pnode = new CNode(id, nLocalServices, GetBestHeight(), hSocket, addr, CalculateKeyedNetGroup(addr), nonce, addr_bind, "", true);
+    CNode* pnode = new CNode(id, nLocalServices, GetBestHeight(), hSocket, addr, CalculateKeyedNetGroup(addr),
+                             nonce, addr_bind, "", true );
     pnode->AddRef();
     pnode->fWhitelisted = whitelisted;
     pnode->m_prefer_evict = bannedlevel > 0;
@@ -1993,7 +2006,170 @@ void CConnman::ThreadMessageHandler()
     }
 }
 
+void CConnman::RelayDarkSendFinalTransaction(const int sessionID, const CTransaction& txNew)
+{
+    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
+    std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
 
+    std::vector < CNode * > vNodesCopy;
+    {
+        LOCK(g_connmanM->cs_vNodes);
+        vNodesCopy = g_connmanM->vNodes;
+    }
+
+    for (CNode* pnode : vNodesCopy) {
+        if (pnode){
+            g_connmanM->PushMessage(pnode, msgMaker.Make("dsf", sessionID, txNew));
+        }
+    }
+}
+
+void CConnman::RelayDarkSendIn(const std::vector<CTxIn>& in, const int64_t& nAmount, const CTransaction& txCollateral, const std::vector<CTxOut>& out)
+{
+    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
+    std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+
+    std::vector<CNode*> vNodesCopy;
+    {
+        LOCK(g_connmanM->cs_vNodes);
+        vNodesCopy = g_connmanM->vNodes;
+    }
+
+    for (CNode* pnode : vNodesCopy) {
+        if(!pnode || (CNetAddr)darkSendPool.submittedToMasternode != (CNetAddr)pnode->addr) continue;
+        LogPrintf("RelayDarkSendIn - found master, relaying message - %s \n", pnode->addr.ToString().c_str());
+        g_connmanM->PushMessage(pnode, msgMaker.Make("dsi", in, nAmount, txCollateral, out));
+    }
+}
+
+void CConnman::RelayDarkSendStatus(const int sessionID, const int newState, const int newEntriesCount, const int newAccepted, const std::string error)
+{
+    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
+    std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+
+    std::vector<CNode*> vNodesCopy;
+    {
+        LOCK(g_connmanM->cs_vNodes);
+        vNodesCopy = g_connmanM->vNodes;
+    }
+
+    for (CNode* pnode : vNodesCopy) {
+        if (pnode){
+            g_connmanM->PushMessage(pnode, msgMaker.Make("dssu", sessionID, newState, newEntriesCount, newAccepted, error));
+        }
+    }
+}
+
+void CConnman::RelayDarkSendElectionEntry(const CTxIn &vin, const CService addr, const std::vector<unsigned char> vchSig, const int64_t nNow, const CPubKey pubkey, const CPubKey pubkey2, const int count, const int current, const int64_t lastUpdated, const int protocolVersion)
+{
+    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
+    std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+
+    std::vector<CNode*> vNodesCopy;
+    {
+        LOCK(g_connmanM->cs_vNodes);
+        vNodesCopy = g_connmanM->vNodes;
+    }
+
+    for (CNode* pnode : vNodesCopy) {
+        if(!pnode || !pnode->fRelayTxes) continue;
+        g_connmanM->PushMessage(pnode, msgMaker.Make("dsee", vin, addr, vchSig, nNow, pubkey, pubkey2, count, current, lastUpdated, protocolVersion));
+    }
+}
+
+void CConnman::SendDarkSendElectionEntry(const CTxIn &vin, const CService addr, const std::vector<unsigned char> vchSig, const int64_t nNow, const CPubKey pubkey, const CPubKey pubkey2, const int count, const int current, const int64_t lastUpdated, const int protocolVersion)
+{
+    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
+    //auto g_connmanM = MakeUnique<CConnman>(0x1337, 0x1337);
+    std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+
+    std::vector<CNode*> vNodesCopy;
+    {
+        LOCK(cs_vNodes);
+        vNodesCopy = vNodes;
+    }
+    for (CNode* pnode : vNodes) {
+        std::cout << "in for loop pnode in net.cpp\n";
+        if (pnode) {
+            g_connmanM->PushMessage(pnode, msgMaker.Make("dsee", vin, addr, vchSig, nNow, pubkey, pubkey2, count, current, lastUpdated,
+                                                         protocolVersion));
+        }
+    }
+}
+
+void CConnman::RelayDarkSendElectionEntryPing(const CTxIn &vin, const std::vector<unsigned char> vchSig, const int64_t nNow, const bool stop)
+{
+    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
+    std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+
+    std::vector<CNode*> vNodesCopy;
+    {
+        LOCK(g_connmanM->cs_vNodes);
+        vNodesCopy = g_connmanM->vNodes;
+    }
+
+    for (CNode* pnode : vNodesCopy) {
+        if(!pnode || !pnode->fRelayTxes) continue;
+        g_connmanM->PushMessage(pnode, msgMaker.Make("dseep", vin, vchSig, nNow, stop));
+    }
+}
+
+void CConnman::SendDarkSendElectionEntryPing(const CTxIn &vin, const std::vector<unsigned char> vchSig, const int64_t nNow, const bool stop)
+{
+    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
+    std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+
+    std::vector<CNode*> vNodesCopy;
+    {
+        LOCK(g_connmanM->cs_vNodes);
+        vNodesCopy = g_connmanM->vNodes;
+    }
+
+    for (CNode* pnode : vNodesCopy) {
+        if (pnode){
+            g_connmanM->PushMessage(pnode, msgMaker.Make("dseep", vin, vchSig, nNow, stop));
+        }
+    }
+}
+
+void CConnman::RelayDarkSendCompletedTransaction(const int sessionID, const bool error, const std::string errorMessage)
+{
+    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
+    std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+
+    std::vector<CNode*> vNodesCopy;
+    {
+        LOCK(g_connmanM->cs_vNodes);
+        vNodesCopy = g_connmanM->vNodes;
+    }
+
+    for (CNode* pnode : vNodesCopy) {
+        if (pnode){
+            g_connmanM->PushMessage(pnode, msgMaker.Make("dsc", sessionID, error, errorMessage));
+        }
+    }
+}
+
+void CConnman::RelayTransactionLockReq(const CTransaction& tx, bool relayToAll)
+{
+    std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
+    CInv inv(MSG_TXLOCK_REQUEST, tx.GetHash());
+    //broadcast the new node
+    vector<CNode*> vNodesCopy;
+    {
+        LOCK(cs_vNodes);
+        vNodesCopy = vNodes;
+    }
+
+    for (CNode* pnode : vNodesCopy) {
+        if (!pnode || (!relayToAll && !pnode->fRelayTxes))
+            continue;
+
+        PushMessage(pnode, msgMaker.Make("ix", tx));
+        //pnode->PushMessage("ix", tx);
+    }
+}
 
 
 
@@ -2176,7 +2352,7 @@ bool CConnman::InitBinds(const std::vector<CService>& binds, const std::vector<C
     return fBound;
 }
 
-bool CConnman::Start(CScheduler& scheduler, const Options& connOptions)
+bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, const Options& connOptions, CConnman* connman)
 {
     Init(connOptions);
 
@@ -2274,6 +2450,23 @@ bool CConnman::Start(CScheduler& scheduler, const Options& connOptions)
     // Dump network addresses
     scheduler.scheduleEvery(std::bind(&CConnman::DumpAddresses, this), DUMP_PEERS_INTERVAL * 1000);
 
+    std::string wallet_name="";
+    for (const std::shared_ptr<CWallet>& pwallet : GetWallets()) {
+        std::string wallet_name = pwallet->GetName();
+    }
+    std::shared_ptr <CWallet> wallet = GetWallet(wallet_name);
+    CWallet *const pwallet = wallet.get();
+
+    if (gArgs.GetBoolArg("-staking", DEFAULT_STAKE) && pwallet) {
+#if 1
+
+        stake->GenerateStakes(threadGroup, pwallet, 1, connman);
+#else
+        //        threadGroup.create_thread(boost::bind(&ThreadStakeMiner, pwalletMain));
+#endif
+    } else {
+        LogPrintf("Staking disabled\n");
+    }
     return true;
 }
 
@@ -2422,6 +2615,15 @@ bool CConnman::RemoveAddedNode(const std::string& strNode)
     return false;
 }
 
+int CConnman::numberconn(){
+    int nNum = 0;
+    for (const auto &pnode : vNodes) {
+        //if (flags & (pnode->fInbound ? CONNECTIONS_IN : CONNECTIONS_OUT)) {
+        nNum++;
+        //}
+    }
+    return nNum;
+}
 size_t CConnman::GetNodeCount(NumConnections flags)
 {
     LOCK(cs_vNodes);
@@ -2614,7 +2816,8 @@ int CConnman::GetBestHeight() const
 
 unsigned int CConnman::GetReceiveFloodSize() const { return nReceiveFloodSize; }
 
-CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress& addrIn, uint64_t nKeyedNetGroupIn, uint64_t nLocalHostNonceIn, const CAddress& addrBindIn, const std::string& addrNameIn, bool fInboundIn)
+CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress& addrIn, uint64_t nKeyedNetGroupIn,
+             uint64_t nLocalHostNonceIn, const CAddress& addrBindIn, const std::string& addrNameIn, bool fInboundIn )
     : nTimeConnected(GetSystemTimeInSeconds()),
     addr(addrIn),
     addrBind(addrBindIn),
@@ -2625,6 +2828,7 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     id(idIn),
     nLocalHostNonce(nLocalHostNonceIn),
     nLocalServices(nLocalServicesIn),
+    ssSend(SER_NETWORK, INIT_PROTO_VERSION),
     nMyStartingHeight(nMyStartingHeightIn)
 {
     hSocket = hSocketIn;
@@ -2633,6 +2837,7 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     hashContinue = uint256();
     filterInventoryKnown.reset();
     pfilter = MakeUnique<CBloomFilter>();
+    fDarkSendMaster = false;
 
     for (const std::string &msg : getAllNetMessageTypes())
         mapRecvBytesPerMsgCmd[msg] = 0;
@@ -2645,11 +2850,77 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     }
 }
 
+void CNode::BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend)
+{
+    ENTER_CRITICAL_SECTION(cs_vSend);
+    assert(ssSend.size() == 0);
+    ssSend << CMessageHeader(Params().MessageStart(),pszCommand, 0);
+    //LogPrint("net", "sending: %s ", SanitizeString(pszCommand));
+
+}
+
+void CNode::AbortMessage() UNLOCK_FUNCTION(cs_vSend)
+{
+    ssSend.clear();
+    LEAVE_CRITICAL_SECTION(cs_vSend);
+    //LogPrint("net", "(aborted)\n");
+}
+
+
+void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
+{
+    // The -*messagestest options are intentionally not documented in the help message,
+    // since they are only used during development to debug the networking code and are
+    // not intended for end-users.
+    /*if (GetRand(gArgs.GetArg("-dropmessagestest", 2)) == 0) {
+        //LogPrint("net", "dropmessages DROPPING SEND MESSAGE\n");
+        AbortMessage();
+        return;
+    }
+    if (mapArgs.count("-fuzzmessagestest")){
+        Fuzz(gArgs.GetArg("-fuzzmessagestest", 10));
+    }*/
+
+    if (ssSend.size() == 0){
+        return;
+    }
+
+
+    // Set the size
+    unsigned int nSize = ssSend.size() - CMessageHeader::HEADER_SIZE;
+    memcpy((char*)&ssSend[CMessageHeader::MESSAGE_SIZE_OFFSET], &nSize, sizeof(nSize));
+
+    // Set the checksum
+    uint256 hash= Hash(ssSend.begin() + CMessageHeader::HEADER_SIZE, ssSend.end());
+    unsigned int nChecksum = 0;
+    memcpy(&nChecksum, &hash, sizeof(nChecksum));
+    assert(ssSend.size() >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
+    memcpy((char*)&ssSend[CMessageHeader::CHECKSUM_OFFSET], &nChecksum, sizeof(nChecksum));
+
+    //std::vector<unsigned char> serializedHeaderl;
+    //std::deque<CSerializeData>::iterator it = vSendMsg.insert(vSendMsg.end(),CSerializeData());
+    //ssSend.GetAndClear(*it);
+    //nSendSize += (*it).size();
+
+    // If write queue empty, attempt "optimistic write"
+    //if (it == vSendMsg.begin())
+
+    //std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()),GetRand(std::numeric_limits<uint64_t>::max())));
+
+    CConnman *g_connmanM = new CConnman(GetRand(std::numeric_limits<uint64_t>::max()),GetRand(std::numeric_limits<uint64_t>::max()));
+    for(CNode* pnode : g_connmanM->vNodes) {
+        if (id == pnode->GetId()) {
+            pnode->fDisconnect = true;
+        }
+        g_connmanM->SocketSendData(pnode);
+    }
+    LEAVE_CRITICAL_SECTION(cs_vSend);
+}
+
 CNode::~CNode()
 {
     CloseSocket(hSocket);
 }
-
 void CNode::AskFor(const CInv& inv)
 {
     if (mapAskFor.size() > MAPASKFOR_MAX_SZ || setAskFor.size() > SETASKFOR_MAX_SZ)

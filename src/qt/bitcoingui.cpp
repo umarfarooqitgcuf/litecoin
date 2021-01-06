@@ -17,6 +17,9 @@
 #include <qt/platformstyle.h>
 #include <qt/rpcconsole.h>
 #include <qt/utilitydialog.h>
+#include "masternodemanager.h"
+#include "smartcontract.h"
+#include "net.h"
 
 #ifdef ENABLE_WALLET
 #include <qt/walletcontroller.h>
@@ -273,6 +276,30 @@ void BitcoinGUI::createActions()
     historyAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_4));
     tabGroup->addAction(historyAction);
 
+    masternodeAction = new QAction(QIcon(":/icons/masternodes"), tr("&Masternodes"), this);
+    masternodeAction->setStatusTip(tr("Browse masternodes"));
+    masternodeAction->setToolTip(masternodeAction->statusTip());
+    masternodeAction->setCheckable(true);
+#ifdef Q_OS_MAC
+    masternodeAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_7));
+#else
+    masternodeAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_7));
+#endif
+    tabGroup->addAction(masternodeAction);
+
+    smartContractAction = new QAction(QIcon(":/icons/smartcontract"), tr("&Smart Contracts"), this);
+    smartContractAction->setStatusTip(tr("Smart Contracts Actions"));
+    smartContractAction->setToolTip(smartContractAction->statusTip());
+    smartContractAction->setCheckable(true);
+    tabGroup->addAction(smartContractAction);
+
+#ifdef Q_OS_MAC
+    smartContractAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_8));
+#else
+    smartContractAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_8));
+#endif
+
+
 #ifdef ENABLE_WALLET
     // These showNormalIfMinimized are needed because Send Coins and Receive Coins
     // can be triggered from the tray menu, and need to show the GUI to be useful.
@@ -355,6 +382,11 @@ void BitcoinGUI::createActions()
     connect(openRPCConsoleAction, &QAction::triggered, this, &BitcoinGUI::showDebugWindow);
     // prevents an open debug window from becoming stuck/unusable on client shutdown
     connect(quitAction, &QAction::triggered, rpcConsole, &QWidget::hide);
+    connect(masternodeAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(masternodeAction, SIGNAL(triggered()), this, SLOT(gotoMasternodePage()));
+    connect(smartContractAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(smartContractAction, SIGNAL(triggered()), this, SLOT(gotoSmartContractPage()));
+
 
 #ifdef ENABLE_WALLET
     if(walletFrame)
@@ -536,6 +568,8 @@ void BitcoinGUI::createToolBars()
         toolbar->addAction(sendCoinsAction);
         toolbar->addAction(receiveCoinsAction);
         toolbar->addAction(historyAction);
+        toolbar->addAction(masternodeAction);
+        toolbar->addAction(smartContractAction);
         overviewAction->setChecked(true);
 
 #ifdef ENABLE_WALLET
@@ -710,6 +744,8 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
     sendCoinsMenuAction->setEnabled(enabled);
     receiveCoinsAction->setEnabled(enabled);
     receiveCoinsMenuAction->setEnabled(enabled);
+    masternodeAction->setEnabled(enabled);
+    smartContractAction->setEnabled(enabled);
     historyAction->setEnabled(enabled);
     encryptWalletAction->setEnabled(enabled);
     backupWalletAction->setEnabled(enabled);
@@ -842,6 +878,21 @@ void BitcoinGUI::gotoHistoryPage()
 {
     historyAction->setChecked(true);
     if (walletFrame) walletFrame->gotoHistoryPage();
+}
+
+void BitcoinGUI::gotoMasternodePage()
+{
+    QSettings settings;
+    if (settings.value("fShowMasternodesTab").toBool()) {
+        masternodeAction->setChecked(true);
+        if (walletFrame) walletFrame->gotoMasternodePage();
+    }
+}
+
+void BitcoinGUI::gotoSmartContractPage()
+{
+    smartContractAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoSmartContractPage();
 }
 
 void BitcoinGUI::gotoReceiveCoinsPage()

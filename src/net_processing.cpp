@@ -62,6 +62,10 @@
 #include <stdint.h>
 #include <univalue.h>
 #include <functional>
+#include "instantx.h"
+#include "masternode.h"
+#include "masternodeconfig.h"
+#include "spork.h"
 
 
 #if defined(NDEBUG)
@@ -1100,7 +1104,24 @@ bool static AlreadyHave(const CInv& inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
         }
     case MSG_BLOCK:
     case MSG_WITNESS_BLOCK:
+        {
         return LookupBlockIndex(inv.hash) != nullptr;
+    }
+    case MSG_TXLOCK_REQUEST:{
+        return mapTxLockReq.count(inv.hash) ||
+               mapTxLockReqRejected.count(inv.hash);
+    }
+    case MSG_TXLOCK_VOTE:
+        {
+        return mapTxLockVote.count(inv.hash);
+    }
+    case MSG_SPORK:
+        {
+        return mapSporks.count(inv.hash);
+    }
+    case MSG_MASTERNODE_WINNER: {
+        return mapSeenMasternodeVotes.count(inv.hash);
+    }
     }
     // Don't know what it is, just say we already got one
     return true;
@@ -1310,6 +1331,7 @@ void static ProcessGetData(CNode* pfrom, const CChainParams& chainparams, CConnm
 {
     AssertLockNotHeld(cs_main);
 
+    const Consensus::Params& consensusParams = chainparams.GetConsensus();
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
     std::vector<CInv> vNotFound;
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
@@ -1323,8 +1345,157 @@ void static ProcessGetData(CNode* pfrom, const CChainParams& chainparams, CConnm
             if (pfrom->fPauseSend)
                 break;
 
-            const CInv &inv = *it;
-            it++;
+            const CInv& inv = *it;
+            {
+                boost::this_thread::interruption_point();
+                it++;
+
+                if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_WITNESS_BLOCK) {
+
+                    bool send = false;
+                    CBlockIndex* pindex = LookupBlockIndex(inv.hash);
+                    if (pindex) {
+                        if (chainActive.Contains(pindex)) {
+                            send = true;
+                        } else {
+                            // To prevent fingerprinting attacks, only send blocks outside of the active
+                            // chain if they are valid, and no more than a max reorg depth than the best header
+                            // chain we know about.
+                            send = pindex->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
+                                   (chainActive.Height() - pindex->nHeight < Params().MaxReorganizationDepth());
+                            if (!send) {
+                                LogPrintf("ProcessGetData(): ignoring request from peer=%i for old block that isn't in the main chain\n", pfrom->GetId());
+                            }
+                        }
+                    }
+
+                    // Don't send not-validated blocks
+                    if (send && pindex && (pindex->nStatus & BLOCK_HAVE_DATA)) {
+                        // Send block from disk
+                        CBlock block;
+                        if (ReadBlockFromDisk(block, pindex, consensusParams)) {
+                            if (inv.type == MSG_BLOCK)
+                                g_connman.get()->PushMessage(pfrom ,msgMaker.Make("block", block));//TODO: push message with flag NO_WITNESS
+                            else if (inv.type == MSG_WITNESS_BLOCK)
+                                g_connman.get()->PushMessage(pfrom ,msgMaker.Make("block", block));
+                            else // MSG_FILTERED_BLOCK)
+                            {
+                                LOCK(pfrom->cs_filter);
+                                if (pfrom->pfilter) {
+                                    CMerkleBlock merkleBlock(block, *pfrom->pfilter);
+                                    g_connman.get()->PushMessage(pfrom ,msgMaker.Make("merkleblock", merkleBlock));
+                                    // CMerkleBlock just contains hashes, so also push any transactions in the block the client did not see
+                                    // This avoids hurting performance by pointlessly requiring a round-trip
+                                    // Note that there is currently no way for a node to request any single transactions we didnt send here -
+                                    // they must either disconnect and retry or request the full block.
+                                    // Thus, the protocol spec specified allows for us to provide duplicate txn here,
+                                    // however we MUST always provide at least what the remote peer needs
+                                    typedef std::pair<unsigned int, uint256> PairType;
+                                    for (PairType& pair : merkleBlock.vMatchedTxn)
+                                        g_connman.get()->PushMessage(pfrom ,msgMaker.Make("tx", block.vtx[pair.first]));//TODO: push message with flag NO_WITNESS
+                                }
+                                // else
+                                // no response
+                            }
+                        } else {
+                            // no response
+                            LogPrintf("ProcessGetData(): Cannot read ReadBlockFromDisk (peer=%i; block=%d)\n", pfrom->GetId(), pindex->nHeight);
+                        }
+
+                        // Trigger them to send a getblocks request for the next batch of inventory
+                        if (inv.hash == pfrom->hashContinue) {
+                            // Bypass PushInventory, this must send even if redundant,
+                            // and we want it right after the last block so they don't
+                            // wait for other stuff first.
+                            vector<CInv> vInv;
+                            vInv.push_back(CInv(MSG_BLOCK, chainActive.Tip()->GetBlockHash()));
+
+                            g_connman.get()->PushMessage(pfrom ,msgMaker.Make("inv",vInv));
+                            //pfrom->hashContinue = 0;
+                        }
+                    }
+                }
+                else if (inv.type == MSG_TX || inv.type == MSG_WITNESS_TX) {
+                    // Send stream from relay memory
+                    bool pushed = false;
+                    {
+                        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                        {
+                            //LOCK(cs_mapRelay);
+                            auto mi = mapRelay.find(inv.hash);
+                            if (mi != mapRelay.end()) {
+                                try {
+                                    std::string command = inv.GetCommand();
+                                    connman->PushMessage(pfrom, msgMaker.Make(command,ss));
+                                } catch (std::out_of_range& e) {
+                                    LogPrintf("%s: out_of_range in inv.GetCommand()\n", __func__);
+                                }
+                                int nSendFlags = (inv.type == MSG_TX ? SERIALIZE_TRANSACTION_NO_WITNESS : 0);
+                                connman->PushMessage(pfrom, msgMaker.Make(nSendFlags, inv.GetCommand(), *mi->second));
+                                //ss += (*mi).second;
+                                pushed = true;
+                            }
+                        }
+                    }
+
+                    if (!pushed && inv.type == MSG_TX) { //TODO: probably should check for MSG_TX_WITNESS too
+                        CTransaction tx;
+                        CTransactionRef ptx = mempool.get(inv.hash);
+                        if (ptx) {
+                            tx = *ptx.get();
+                            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                            ss.reserve(1000); //TODO: if we check for MSG_TX_WITNESS, should this value be changed?
+                            ss << tx;
+                            g_connman.get()->PushMessage(pfrom ,msgMaker.Make("tx", ss));
+                            pushed = true;
+                        }
+                    }
+                    if (!pushed && inv.type == MSG_TXLOCK_VOTE) {
+                        if (mapTxLockVote.count(inv.hash)) {
+                            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                            ss.reserve(1000);
+                            ss << mapTxLockVote[inv.hash];
+                            g_connman.get()->PushMessage(pfrom ,msgMaker.Make("txlvote", ss));//TODO: push message with flags
+                            pushed = true;
+                        }
+                    }
+                    if (!pushed && inv.type == MSG_TXLOCK_REQUEST) {
+                        if (mapTxLockReq.count(inv.hash)) {
+                            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                            ss.reserve(1000);
+                            ss << mapTxLockReq[inv.hash];
+                            connman->PushMessage(pfrom, msgMaker.Make("ix", ss));
+                            pushed = true;
+                        }
+                    }
+                    if (!pushed && inv.type == MSG_SPORK) {
+                        if (mapSporks.count(inv.hash)) {
+                            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                            ss.reserve(1000);
+                            ss << mapSporks[inv.hash];
+                            connman->PushMessage(pfrom, msgMaker.Make("spork", ss));
+                            pushed = true;
+                        }
+                    }
+                    if (!pushed && inv.type == MSG_MASTERNODE_WINNER) {
+                        if (mapSeenMasternodeVotes.count(inv.hash)) {
+                            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                            int a = 0;
+                            ss.reserve(1000);
+                            ss << mapSeenMasternodeVotes[inv.hash] << a;
+                            connman->PushMessage(pfrom, msgMaker.Make("mnw", ss));
+                            pushed = true;
+                        }
+                    }
+
+                    if (!pushed) {
+                        vNotFound.push_back(inv);
+                    }
+                }
+
+                if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_WITNESS_BLOCK)
+                    break;
+            }
 
             // Send stream from relay memory
             bool push = false;
@@ -2971,6 +3142,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             // seconds to respond to each, the 5th ping the remote sends would appear to
             // return very quickly.
             connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::PONG, nonce));
+            //connman->PushMessage(pfrom, msgMaker.Make("dseg",CTxIn()));
         }
         return true;
     }
@@ -3113,6 +3285,24 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         // message would be undesirable as we transmit it ourselves.
         return true;
     }
+
+
+    bool processed = false;
+#   if 0
+    if (!processed) darksendPool.ProcessMessage(pfrom, strCommand, vRecv, processed);
+    if (!processed) mnodeman.ProcessMessage(pfrom, strCommand, vRecv, processed);
+    if (!processed) budget.ProcessMessage(pfrom, strCommand, vRecv, processed);
+    if (!processed) masternodePayments.ProcessMessage(pfrom, strCommand, vRecv, processed);
+    if (!processed) ProcessInstanTX(pfrom, strCommand, vRecv, processed);
+    if (!processed) ProcessSpork(pfrom, strCommand, vRecv, processed);
+    if (!processed) masternodeSync.ProcessMessage(pfrom, strCommand, vRecv, processed);
+#   else
+    if (!processed) ProcessMessageDarksend(pfrom, strCommand, vRecv, processed);
+    if (!processed) ProcessMasternode(pfrom, strCommand, vRecv, processed);
+    if (!processed) ProcessMasternodeConnections();
+    if (!processed) ProcessInstantX(pfrom, strCommand, vRecv, processed);
+    if (!processed) ProcessSpork(pfrom, strCommand, vRecv, processed);
+#       endif
 
     // Ignore unknown commands for extensibility
     LogPrint(BCLog::NET, "Unknown command \"%s\" from peer=%d\n", SanitizeString(strCommand), pfrom->GetId());

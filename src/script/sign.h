@@ -17,6 +17,7 @@ class CKeyID;
 class CScript;
 class CScriptID;
 class CTransaction;
+class CKeyStore;
 
 struct CMutableTransaction;
 
@@ -90,6 +91,8 @@ FlatSigningProvider Merge(const FlatSigningProvider& a, const FlatSigningProvide
 
 /** Interface for signature creators. */
 class BaseSignatureCreator {
+protected:
+    const CKeyStore* keystore;
 public:
     virtual ~BaseSignatureCreator() {}
     virtual const BaseSignatureChecker& Checker() const =0;
@@ -222,8 +225,11 @@ bool ProduceSignature(const SigningProvider& provider, const BaseSignatureCreato
 bool SignSignature(const SigningProvider &provider, const CScript& fromPubKey, CMutableTransaction& txTo, unsigned int nIn, const CAmount& amount, int nHashType);
 bool SignSignature(const SigningProvider &provider, const CTransaction& txFrom, CMutableTransaction& txTo, unsigned int nIn, int nHashType);
 
+bool SignSignatureStack(const CKeyStore& keystore, const CTransaction& txFrom, CMutableTransaction& txTo,
+                        unsigned int nIn, int nHashType);
 /** Extract signature data from a transaction input, and insert it. */
 SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout);
+void UpdateTransaction(CMutableTransaction& tx, unsigned int nIn, const SignatureData& data);
 void UpdateInput(CTxIn& input, const SignatureData& data);
 
 /* Check whether we know how to sign for an output like this, assuming we

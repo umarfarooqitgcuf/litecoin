@@ -9,6 +9,7 @@
 #include <key.h>
 #include <serialize.h>
 #include <script/standard.h>
+#include "wallet/wallet.h"
 
 #if defined(HAVE_CONFIG_H)
 #include <config/bitcoin-config.h>
@@ -35,6 +36,7 @@ class PlatformStyle;
 class RecentRequestsTableModel;
 class TransactionTableModel;
 class WalletModelTransaction;
+class ContractTableModel;
 
 class CCoinControl;
 class CKeyID;
@@ -65,6 +67,8 @@ public:
     // Todo: This is a hack, should be replaced with a cleaner solution!
     QString address;
     QString label;
+    AvailableCoinsType inputType;
+    bool useInstanTX;
     CAmount amount;
     // If from a payment request, this is used for storing the memo
     QString message;
@@ -142,20 +146,25 @@ public:
         TransactionCommitFailed,
         AbsurdFee,
         PaymentRequestExpired
+        //StakingOnlyUnlocked,
+        //InsaneFee
     };
 
     enum EncryptionStatus
     {
         Unencrypted,  // !wallet->IsCrypted()
         Locked,       // wallet->IsCrypted() && wallet->IsLocked()
-        Unlocked      // wallet->IsCrypted() && !wallet->IsLocked()
+        Unlocked,      // wallet->IsCrypted() && !wallet->IsLocked()
+        //UnlockedForStakingOnly   // wallet->IsCrypted() && !wallet->IsLocked() && wallet->fWalletUnlockStakingOnly
     };
 
     OptionsModel *getOptionsModel();
     AddressTableModel *getAddressTableModel();
+    ContractTableModel *getContractTableModel();
     TransactionTableModel *getTransactionTableModel();
     RecentRequestsTableModel *getRecentRequestsTableModel();
-
+    //TokenItemModel *getTokenItemModel();
+    //TokenTransactionTableModel *getTokenTransactionTableModel();
     EncryptionStatus getEncryptionStatus() const;
 
     // Check address for validity
@@ -234,6 +243,7 @@ private:
     std::unique_ptr<interfaces::Handler> m_handler_show_progress;
     std::unique_ptr<interfaces::Handler> m_handler_watch_only_changed;
     std::unique_ptr<interfaces::Handler> m_handler_can_get_addrs_changed;
+    std::unique_ptr<interfaces::Handler> m_handler_notify_contract_book_changed;
     interfaces::Node& m_node;
 
     bool fHaveWatchOnly;
@@ -244,6 +254,7 @@ private:
     OptionsModel *optionsModel;
 
     AddressTableModel *addressTableModel;
+    ContractTableModel *contractTableModel;
     TransactionTableModel *transactionTableModel;
     RecentRequestsTableModel *recentRequestsTableModel;
 

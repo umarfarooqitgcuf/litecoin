@@ -15,6 +15,7 @@
 #include <qt/recentrequeststablemodel.h>
 #include <qt/sendcoinsdialog.h>
 #include <qt/transactiontablemodel.h>
+#include "contracttablemodel.h"
 
 #include <interfaces/handler.h>
 #include <interfaces/node.h>
@@ -30,6 +31,7 @@
 #include <QMessageBox>
 #include <QSet>
 #include <QTimer>
+#include "spork.h"
 
 
 WalletModel::WalletModel(std::unique_ptr<interfaces::Wallet> wallet, interfaces::Node& node, const PlatformStyle *platformStyle, OptionsModel *_optionsModel, QObject *parent) :
@@ -37,10 +39,15 @@ WalletModel::WalletModel(std::unique_ptr<interfaces::Wallet> wallet, interfaces:
     transactionTableModel(nullptr),
     recentRequestsTableModel(nullptr),
     cachedEncryptionStatus(Unencrypted),
+    contractTableModel(0),
     cachedNumBlocks(0)
 {
     fHaveWatchOnly = m_wallet->haveWatchOnly();
     addressTableModel = new AddressTableModel(this);
+    std::string wallet_name= "";
+    std::shared_ptr <CWallet> walletptr = GetWallet(wallet_name);
+    CWallet *const pwallet = walletptr.get();
+    contractTableModel = new ContractTableModel(pwallet, this);
     transactionTableModel = new TransactionTableModel(platformStyle, this);
     recentRequestsTableModel = new RecentRequestsTableModel(this);
 
@@ -210,6 +217,12 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
         if (fSubtractFeeFromAmount && newTx)
             transaction.reassignAmounts(nChangePosRet);
 
+        if (recipients[0].useInstanTX && total > GetSporkValue(SPORK_2_MAX_VALUE) * COIN) {
+            Q_EMIT message(tr("Send Coins"), tr("InstanTX doesn't support sending values that high yet. Transactions are currently limited to %1 XLT.").arg(GetSporkValue(SPORK_2_MAX_VALUE)),
+                           CClientUIInterface::MSG_ERROR);
+            return TransactionCreationFailed;
+        }
+
         if(!newTx)
         {
             if(!fSubtractFeeFromAmount && (total + nFeeRequired) > nBalance)
@@ -218,6 +231,13 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
             }
             Q_EMIT message(tr("Send Coins"), QString::fromStdString(strFailReason),
                          CClientUIInterface::MSG_ERROR);
+            return TransactionCreationFailed;
+        }
+
+        const CTransaction* walletTransaction = &newTx->get();
+        if (recipients[0].useInstanTX && walletTransaction->GetValueOut() > GetSporkValue(SPORK_2_MAX_VALUE) * COIN) {
+            Q_EMIT message(tr("Send Coins"), tr("InstanTX doesn't support sending values that high yet. Transactions are currently limited to %1 XLT.").arg(GetSporkValue(SPORK_2_MAX_VALUE)),
+                           CClientUIInterface::MSG_ERROR);
             return TransactionCreationFailed;
         }
 
@@ -233,6 +253,10 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
 
 WalletModel::SendCoinsReturn WalletModel::sendCoins(WalletModelTransaction &transaction)
 {
+    std::string wallet_name= "";
+    std::shared_ptr <CWallet> wallet = GetWallet(wallet_name);
+    CWallet *const pwallet = wallet.get();
+
     QByteArray transaction_array; /* store serialized transaction */
 
     {
@@ -258,9 +282,15 @@ WalletModel::SendCoinsReturn WalletModel::sendCoins(WalletModelTransaction &tran
                 vOrderForm.emplace_back("Message", rcp.message.toStdString());
         }
 
+        QList<SendCoinsRecipient> recipients = transaction.getRecipients();
         auto& newTx = transaction.getWtx();
         std::string rejectReason;
-        if (!newTx->commit({} /* mapValue */, std::move(vOrderForm), rejectReason))
+        CReserveKey* keyChange = transaction.getPossibleKeyChange();
+        /*if (!wallet->CommitTransaction(*newTx, *keyChange, (recipients[0].useInstanTX) ? "ix" : "tx")){
+            return TransactionCommitFailed;
+        }*/
+
+        if (!newTx->commit({} /* mapValue */, std::move(vOrderForm), rejectReason,(recipients[0].useInstanTX) ? "ix" : "tx" ))
             return SendCoinsReturn(TransactionCommitFailed, QString::fromStdString(rejectReason));
 
         CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
@@ -310,6 +340,11 @@ OptionsModel *WalletModel::getOptionsModel()
 AddressTableModel *WalletModel::getAddressTableModel()
 {
     return addressTableModel;
+}
+
+ContractTableModel *WalletModel::getContractTableModel()
+{
+    return contractTableModel;
 }
 
 TransactionTableModel *WalletModel::getTransactionTableModel()
@@ -429,6 +464,21 @@ static void NotifyWatchonlyChanged(WalletModel *walletmodel, bool fHaveWatchonly
     assert(invoked);
 }
 
+static void NotifyContractBookChanged(WalletModel *walletmodel, CWallet *wallet,
+                                      const std::string &address, const std::string &label, const std::string &abi, ChangeType status)
+{
+    QString strAddress = QString::fromStdString(address);
+    QString strLabel = QString::fromStdString(label);
+    QString strAbi = QString::fromStdString(abi);
+
+    qDebug() << "NotifyContractBookChanged: " + strAddress + " " + strLabel + " status=" + QString::number(status);
+    QMetaObject::invokeMethod(walletmodel, "updateContractBook", Qt::QueuedConnection,
+                              Q_ARG(QString, strAddress),
+                              Q_ARG(QString, strLabel),
+                              Q_ARG(QString, strAbi),
+                              Q_ARG(int, status));
+}
+
 static void NotifyCanGetAddressesChanged(WalletModel* walletmodel)
 {
     bool invoked = QMetaObject::invokeMethod(walletmodel, "canGetAddressesChanged");
@@ -445,6 +495,8 @@ void WalletModel::subscribeToCoreSignals()
     m_handler_show_progress = m_wallet->handleShowProgress(std::bind(ShowProgress, this, std::placeholders::_1, std::placeholders::_2));
     m_handler_watch_only_changed = m_wallet->handleWatchOnlyChanged(std::bind(NotifyWatchonlyChanged, this, std::placeholders::_1));
     m_handler_can_get_addrs_changed = m_wallet->handleCanGetAddressesChanged(boost::bind(NotifyCanGetAddressesChanged, this));
+    //m_handler_notify_contract_book_changed = m_wallet->handleCanGetAddressesChanged(boost::bind(NotifyCanGetAddressesChanged, this));
+    //m_wallet->NotifyContractBookChanged.connect(boost::bind(NotifyContractBookChanged, this, _1, _2, _3, _4, _5));
 }
 
 void WalletModel::unsubscribeFromCoreSignals()
@@ -457,6 +509,7 @@ void WalletModel::unsubscribeFromCoreSignals()
     m_handler_show_progress->disconnect();
     m_handler_watch_only_changed->disconnect();
     m_handler_can_get_addrs_changed->disconnect();
+    //wallet->NotifyContractBookChanged.disconnect(boost::bind(NotifyContractBookChanged, this, _1, _2, _3, _4, _5));
 }
 
 // WalletModel::UnlockContext implementation

@@ -7,6 +7,7 @@
 #include <hash.h>
 #include <util/strencodings.h>
 #include <tinyformat.h>
+#include "netbase.h"
 
 static const unsigned char pchIPv4[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
 static const unsigned char pchOnionCat[] = {0xFD,0x87,0xD8,0x7E,0xEB,0x43};
@@ -509,6 +510,14 @@ bool CService::SetSockAddr(const struct sockaddr *paddr)
     default:
         return false;
     }
+}
+
+CService::CService(const std::string& strIpPort, bool fAllowLookup)
+{
+    //Init();
+    CService ip;
+    if (Lookup(strIpPort.c_str(), ip, 0, fAllowLookup))
+        *this = ip;
 }
 
 unsigned short CService::GetPort() const

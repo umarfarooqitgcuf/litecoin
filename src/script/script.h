@@ -22,6 +22,7 @@
 // Maximum number of bytes pushable to the stack
 static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
 
+typedef std::vector<unsigned char> valtype;
 // Maximum number of non-push operations per script
 static const int MAX_OPS_PER_SCRIPT = 201;
 
@@ -186,6 +187,21 @@ enum opcodetype
     OP_NOP8 = 0xb7,
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
+
+    // Execute EXT byte code.
+    OP_CREATE = 0xc1,
+    OP_CALL = 0xc2,
+    OP_SPEND = 0xc3,
+
+    // template matching params
+    OP_GAS_PRICE = 0xf5,
+    OP_VERSION = 0xf6,
+    OP_GAS_LIMIT = 0xf7,
+    OP_DATA = 0xf8,
+    OP_SMALLINTEGER = 0xfa,
+    OP_PUBKEYS = 0xfb,
+    OP_PUBKEYHASH = 0xfd,
+    OP_PUBKEY = 0xfe,
 
     OP_INVALIDOPCODE = 0xff,
 };
@@ -355,6 +371,30 @@ public:
         return result;
     }
 
+    ///////////////////////////////// lux
+    static uint64_t vch_to_uint64(const std::vector<unsigned char>& vch)
+    {
+        if (vch.size() > 8) {
+            throw scriptnum_error("script number overflow");
+        }
+
+        if (vch.empty())
+            return 0;
+
+        uint64_t result = 0;
+        for (size_t i = 0; i != vch.size(); ++i)
+            result |= static_cast<uint64_t>(vch[i]) << 8*i;
+
+        // If the input vector's most significant byte is 0x80, remove it from
+        // the result's msb and return a negative.
+        if (vch.back() & 0x80)
+            throw scriptnum_error("Negative gas value.");
+        // return -((uint64_t)(result & ~(0x80ULL << (8 * (vch.size() - 1)))));
+
+        return result;
+    }
+    /////////////////////////////////
+
 private:
     static int64_t set_vch(const std::vector<unsigned char>& vch)
     {
@@ -521,6 +561,15 @@ public:
         return (opcodetype)(OP_1+n-1);
     }
 
+    int Find(opcodetype op) const
+    {
+        int nFound = 0;
+        opcodetype opcode;
+        for (const_iterator pc = begin(); pc != end() && GetOp(pc, opcode);)
+            if (opcode == op)
+                ++nFound;
+        return nFound;
+    }
     /**
      * Pre-version-0.6, Bitcoin always counted CHECKMULTISIGs
      * as 20 sigops. With pay-to-script-hash, that changed:
@@ -539,6 +588,12 @@ public:
     bool IsPayToScriptHash() const;
     bool IsPayToWitnessScriptHash() const;
     bool IsWitnessProgram(int& version, std::vector<unsigned char>& program) const;
+    ///////////////////////////////////////////////// // nexalt
+    bool IsNormalPaymentScript() const;
+    bool IsPayToPubkey() const;
+    bool IsPayToPubkeyHash() const;
+    bool IsPayToWitnessPubkeyHash() const;
+    /////////////////////////////////////////////////
 
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it consensus-critical). */
     bool IsPushOnly(const_iterator pc) const;
@@ -556,6 +611,22 @@ public:
     {
         return (size() > 0 && *begin() == OP_RETURN) || (size() > MAX_SCRIPT_SIZE);
     }
+
+    ///////////////////////////////////////// lux
+    bool HasOpCreate() const
+    {
+        return Find(OP_CREATE) == 1;
+    }
+
+    bool HasOpCall() const
+    {
+        return Find(OP_CALL) == 1;
+    }
+    bool HasOpSpend() const
+    {
+        return size()==1 && *begin() == OP_SPEND;
+    }
+    /////////////////////////////////////////
 
     void clear()
     {

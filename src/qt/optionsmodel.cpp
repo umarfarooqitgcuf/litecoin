@@ -19,6 +19,12 @@
 #include <txdb.h> // for -dbcache defaults
 #include <qt/intro.h>
 
+#ifdef ENABLE_WALLET
+#include "masternodeconfig.h"
+#include "wallet/wallet.h"
+#include "wallet/walletdb.h"
+#endif
+
 #include <QNetworkProxy>
 #include <QSettings>
 #include <QStringList>
@@ -79,6 +85,14 @@ void OptionsModel::Init(bool resetSettings)
     if (!settings.contains("fCoinControlFeatures"))
         settings.setValue("fCoinControlFeatures", false);
     fCoinControlFeatures = settings.value("fCoinControlFeatures", false).toBool();
+
+    if (!settings.contains("fShowMasternodesTab"))
+        settings.setValue("fShowMasternodesTab", masternodeConfig.getCount());
+    fShowMasternodesTab = settings.value("fShowMasternodesTab", false).toBool();
+
+    if (!settings.contains("fParallelMasternodes"))
+        settings.setValue("fParallelMasternodes", false);
+    fParallelMasternodes = settings.value("fParallelMasternodes", false).toBool();
 
     // These are shared with the core or have a command-line parameter
     // and we want command-line parameters to overwrite the GUI settings.
@@ -292,6 +306,10 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
             return settings.value("language");
         case CoinControlFeatures:
             return fCoinControlFeatures;
+        case ShowMasternodesTab:
+            return fShowMasternodesTab;
+        case ParallelMasternodes:
+            return settings.value("fParallelMasternodes");
         case Prune:
             return settings.value("bPrune");
         case PruneSize:
@@ -420,6 +438,16 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
             settings.setValue("fCoinControlFeatures", fCoinControlFeatures);
             Q_EMIT coinControlFeaturesChanged(fCoinControlFeatures);
             break;
+            case ShowMasternodesTab:
+                fShowMasternodesTab = value.toBool();
+                settings.setValue("fShowMasternodesTab", fShowMasternodesTab);
+                Q_EMIT showMasternodesTabChanged(fShowMasternodesTab);
+                break;
+            case ParallelMasternodes:
+                fParallelMasternodes = value.toBool();
+                settings.setValue("fParallelMasternodes", fParallelMasternodes);
+                Q_EMIT parallelMasternodesChanged(fParallelMasternodes);
+                break;
         case Prune:
             if (settings.value("bPrune") != value) {
                 settings.setValue("bPrune", value);

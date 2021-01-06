@@ -11,6 +11,13 @@
 #include <stdint.h>
 #include <string>
 
+//#include <boost/multi_index_container.hpp>
+//#include <boost/multi_index/hashed_index.hpp>
+//#include <boost/multi_index/ordered_index.hpp>
+//#include <boost/multi_index/sequenced_index.hpp>
+#include <boost/signals2/signal.hpp>
+
+class CLuxNodeConfig;
 class CWallet;
 class CBlockIndex;
 namespace boost {
@@ -100,6 +107,8 @@ public:
      * Status bar alerts changed.
      */
     ADD_SIGNALS_DECL_WRAPPER(NotifyAlertChanged, void, );
+
+    boost::signals2::signal<void (const CLuxNodeConfig &nodeConfig)> NotifyLuxNodeChanged;
 
     /** A wallet has been loaded. */
     ADD_SIGNALS_DECL_WRAPPER(LoadWallet, void, std::shared_ptr<CWallet> wallet);

@@ -34,6 +34,7 @@ public:
 
     //! whether containing transaction was a coinbase
     unsigned int fCoinBase : 1;
+    unsigned int fCoinStake : 1;
 
     //! at which height this containing transaction was included in the active block chain
     uint32_t nHeight : 31;
@@ -45,14 +46,24 @@ public:
     void Clear() {
         out.SetNull();
         fCoinBase = false;
+        fCoinStake = false;
         nHeight = 0;
     }
 
     //! empty constructor
-    Coin() : fCoinBase(false), nHeight(0) { }
+    //Coin() : fCoinBase(false), nHeight(0) { }
+    Coin() : fCoinBase(false), fCoinStake(false), nHeight(0) { }
 
     bool IsCoinBase() const {
         return fCoinBase;
+    }
+    bool IsCoinStake() const {
+        return fCoinStake;
+    }
+
+    bool IsCoinGenerated() const
+    {
+        return fCoinBase || fCoinStake;
     }
 
     template<typename Stream>
@@ -292,6 +303,9 @@ public:
 
     //! Check whether all prevouts of the transaction are present in the UTXO set represented by this view
     bool HaveInputs(const CTransaction& tx) const;
+
+    //! Return priority of tx at height nHeight
+    double GetPriority(const CTransaction& tx, int nHeight, CAmount &inChainInputValue) const;
 
 private:
     CCoinsMap::iterator FetchCoin(const COutPoint &outpoint) const;

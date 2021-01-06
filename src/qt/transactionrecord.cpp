@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 #include <QDateTime>
+#include <../wallet/wallet.h>
 
 /* Return positive answer if transaction should be shown in list.
  */
@@ -37,7 +38,39 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const interface
     uint256 hash = wtx.tx->GetHash();
     std::map<std::string, std::string> mapValue = wtx.value_map;
 
-    if (nNet > 0 || wtx.is_coinbase)
+    if (wtx.is_coinstake) {
+
+        for(unsigned int i = 1; i < wtx.tx->vout.size(); i++)
+        {
+            const CTxOut& txout = wtx.tx->vout[i];
+            isminetype mine = wtx.txout_is_mine[i];
+            if(mine)
+            {
+                TransactionRecord sub(hash, nTime);
+                CTxDestination address;
+
+                sub.idx = i; // vout index
+                if(wtx.is_coinstake){
+                    if(i == 1){
+                        sub.credit = nNet;
+                        sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
+                        sub.type = TransactionRecord::StakeMint;
+                    }
+                    else if(i == 2 && txout.nValue == 950000000){
+                        sub.credit = txout.nValue;
+                        sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
+                        sub.type = TransactionRecord::MNReward;
+                    }else{
+                        sub.credit = txout.nValue;
+                        sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
+                        sub.type = TransactionRecord::StakeMint;
+                    }
+                }
+                parts.append(sub);
+            }
+        }
+    }
+    else if (nNet > 0 || wtx.is_coinbase)
     {
         //
         // Credit
@@ -187,7 +220,7 @@ void TransactionRecord::updateStatus(const interfaces::WalletTxStatus& wtx, int 
         }
     }
     // For generated transactions, determine maturity
-    else if(type == TransactionRecord::Generated)
+    else if(type == TransactionRecord::Generated /*|| type == TransactionRecord::StakeMint || type == TransactionRecord::MNReward*/)
     {
         if (wtx.blocks_to_maturity > 0)
         {

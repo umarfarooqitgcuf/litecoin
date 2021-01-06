@@ -27,6 +27,7 @@
 
 #include <QDebug>
 #include <QTimer>
+#include "masternode.h"
 
 static int64_t nLastHeaderTipUpdateNotification = 0;
 static int64_t nLastBlockTipUpdateNotification = 0;
@@ -37,6 +38,7 @@ ClientModel::ClientModel(interfaces::Node& node, OptionsModel *_optionsModel, QO
     optionsModel(_optionsModel),
     peerTableModel(nullptr),
     banTableModel(nullptr),
+    cachedMasternodeCountString(""),
     pollTimer(nullptr)
 {
     cachedBestHeaderHeight = -1;
@@ -46,6 +48,11 @@ ClientModel::ClientModel(interfaces::Node& node, OptionsModel *_optionsModel, QO
     pollTimer = new QTimer(this);
     connect(pollTimer, &QTimer::timeout, this, &ClientModel::updateTimer);
     pollTimer->start(MODEL_UPDATE_DELAY);
+
+    pollMnTimer = new QTimer(this);
+    connect(pollMnTimer, SIGNAL(timeout()), this, SLOT(updateMnTimer()));
+    pollMnTimer->start(MODEL_UPDATE_DELAY * 4);
+
 
     subscribeToCoreSignals();
 }
@@ -69,6 +76,10 @@ int ClientModel::getNumConnections(unsigned int flags) const
     return m_node.getNodeCount(connections);
 }
 
+QString ClientModel::getMasternodeCountString() const
+{
+    return QString::number((int)vecMasternodes.size()) + " / " + QString::number((int)vecMasternodes.size());
+}
 int ClientModel::getHeaderTipHeight() const
 {
     if (cachedBestHeaderHeight == -1) {
@@ -105,9 +116,29 @@ void ClientModel::updateTimer()
     Q_EMIT bytesChanged(m_node.getTotalBytesRecv(), m_node.getTotalBytesSent());
 }
 
+void ClientModel::updateMnTimer()
+{
+    QString newMasternodeCountString = getMasternodeCountString();
+    if (cachedMasternodeCountString != newMasternodeCountString) {
+        cachedMasternodeCountString = newMasternodeCountString;
+
+        Q_EMIT strMasternodesChanged(cachedMasternodeCountString);
+    }
+}
+
 void ClientModel::updateNumConnections(int numConnections)
 {
     Q_EMIT numConnectionsChanged(numConnections);
+}
+
+void ClientModel::getGasInfo(uint64_t& blockGasLimit, uint64_t& minGasPrice, uint64_t& nGasPrice) const
+{
+    /*LOCK(cs_main);
+
+    LuxDGP luxDGP(globalState.get(), fGettingValuesDGP);
+    blockGasLimit = luxDGP.getBlockGasLimit(chainActive.Height());
+    minGasPrice = CAmount(luxDGP.getMinGasPrice(chainActive.Height()));
+    nGasPrice = (minGasPrice>DEFAULT_GAS_PRICE) ? minGasPrice : DEFAULT_GAS_PRICE;*/
 }
 
 void ClientModel::updateNetworkActive(bool networkActive)
