@@ -31,7 +31,8 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
             pindex = pindex->pprev;
         }
     }else {*/
-        while (pindex && pindex->pprev && (block.IsProofOfStake() != fProofOfStake)) {
+    int i = 0;
+        while (pindex && pindex->pprev && (block.IsProofOfStake() != fProofOfStake) && i < 4000) {
             //std::cout << "in while loop==" << pindex->nHeight << "\n";
             pindex = pindex->pprev;
 
@@ -40,6 +41,10 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
 
             if (IsBlockPruned(pindex)) {}
             if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {}
+            if (i == 3999){
+                pindex = ::chainActive[1];
+            }
+            i++;
         }
     return pindex;
 }
