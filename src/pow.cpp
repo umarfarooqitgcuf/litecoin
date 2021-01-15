@@ -17,45 +17,23 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
 {
     CBlock block;
     if (IsBlockPruned(pindex)) {}
-    if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {}
+    if (!ReadBlockFromDiskPow(block, pindex, Params().GetConsensus())) {}
 
-    bool fProofOfStakeFirst;
-    fProofOfStakeFirst = block.IsProofOfStake();
-    if (pindex->nTime > START_POS_BLOCK && fProofOfStake){
-        fProofOfStakeFirst = block.IsProofOfStake();
-    }else{
-        fProofOfStakeFirst = pindex->IsProofOfStake();
+    int i = 0;
+    while (pindex && pindex->pprev && (block.IsProofOfStake() != fProofOfStake) && i < 4000) {
+        pindex = pindex->pprev;
+        if (IsBlockPruned(pindex)) {}
+        if (!ReadBlockFromDiskPow(block, pindex, Params().GetConsensus())) {}
+        if (i == 3999){
+            pindex = ::chainActive[1];
+        }
+        i++;
     }
-    /*if (pindex->nTime < START_POS_BLOCK && fProofOfStake){
-        while (pindex && pindex->pprev) {
-            pindex = pindex->pprev;
-        }
-    }else {*/
-        while (pindex && pindex->pprev && (block.IsProofOfStake() != fProofOfStake)) {
-            //std::cout << "in while loop==" << pindex->nHeight << "\n";
-            pindex = pindex->pprev;
-
-            //std::cout << "pindex->IsProofOfStake() in while loop==" << pindex->IsProofOfStake() << "==nheight=="<< pindex->nHeight << "\n";
-            //std::cout << "block.IsProofOfStake() in while loop==" << block.IsProofOfStake() << "==nheight=="<< pindex->nHeight << "\n";
-
-            if (IsBlockPruned(pindex)) {}
-            if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {}
-        }
     return pindex;
 }
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params, bool fProofOfStake)
 {
-    /*while (pindexLast != nullptr){
-        if (pindexLast->IsProofOfStake()){
-
-            if (pindexLast->nTime > START_POS_BLOCK){
-                std::cout<<"time is new\n";
-            }
-            std::cout<<"proof of stake block height== "<<pindexLast->nHeight<<"\n";
-        }
-        pindexLast = pindexLast->pprev;
-    }*/
 
     if ((pblock->GetBlockTime() >= START_POS_BLOCK) /*&& fProofOfStake*/) {
         int64_t nTargetSpacing = params.nPowTargetSpacing;

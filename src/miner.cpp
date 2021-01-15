@@ -396,25 +396,25 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     std::string value_my =  this_is_my_key;
     //value_my = this_is_my_key;
     double mlcDistribution = ((GetBlockSubsidy(nHeight, chainparams.GetConsensus()) * 33.34) / 100 ) / COIN;
-    double uplineReward = UpLineReward(nHeight, GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
-    double mainminerReward;
+    double uplineReward = UpLineReward(nHeight);
+    double mainminerReward = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
     bool  ismagic = IsMagicBlock(nHeight);
-    if (ismagic){
-        mainminerReward = nFees + MagicBlockReward(nHeight, GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
-        mainminerReward = mainminerReward - (uplineReward * 10);
-    }else {
-        mainminerReward = nFees + MainMinerReward(nHeight, GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
-    }
-
-    uint32_t nposstarttime = START_POS_BLOCK;
     int64_t timeNow = GetTime();
-    if (timeNow > nposstarttime ){
+
+    if (timeNow > START_POS_BLOCK ){
+        mainminerReward = nFees + MainMinerReward(nHeight);
+        if (timeNow > START_POS_BLOCK_V2){
+            mainminerReward = nFees + MinerRewardV2(nHeight);
+        }
     }else{
-        double mainminerReward = (nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus())) - (mlcDistribution * COIN);
+        mainminerReward = (nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus())) - (mlcDistribution * COIN);
         double subsidy = (GetBlockSubsidy(nHeight, chainparams.GetConsensus()) * 33.34 / 100 ) / COIN;
         uplineReward = ((subsidy * 10) /100) * COIN ;
     }
 
+    if (ismagic){
+        mainminerReward = nFees + MagicBlockReward(nHeight, GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
+    }
     coinbaseTx.vin.resize(1);
     coinbaseTx.vin[0].prevout.SetNull();
     coinbaseTx.vout.resize(1);
@@ -432,48 +432,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     CAmount minerReward = 0;
     CAmount powReward = GetBlockSubsidy(nHeight, chainparams.GetConsensus()) ;
     CAmount totalReward =  nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
-    if (SelectMasternodePayee(mnPayee)) {
-        coinbaseTx.vout.resize(1 + 1);
-        coinbaseTx.vout[1].scriptPubKey = mnPayee;//GetScriptForDestination(dest);
-        coinbaseTx.vout[1].nValue = mnReward;
 
-        CTxDestination txDest;
-        ExtractDestination(mnPayee, txDest);
-        LogPrintf("%s: Masternode payment to %s (pow)\n", __func__, EncodeDestination(txDest));
-        LogPrintf("Masternode reward %s\n", mnReward);
-        minerReward = totalReward - mnReward ;
-
-        for (int i = 2; i < 12; i++) {
-            if (KeyValue[i-1] != "") {
-            coinbaseTx.vout.resize(i + 1);
-            CTxDestination dest = DecodeDestination(KeyValue[i-2]);
-            std::string wallet_name;
-            if(mlc_wallet_name == ""){
-                wallet_name = "";
-            }else{
-                wallet_name = mlc_wallet_name;
-            }
-            std::shared_ptr <CWallet> wallet = GetWallet(wallet_name);
-            isminetype mine = IsMine(*wallet, dest);
-            if (bool(mine & ISMINE_SPENDABLE) == 1){
-                throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s", __func__, "Invalid MLC Tree"));
-            }else{
-                bool isValid = IsValidDestination(dest);
-                CScript scriptPubKey;
-                if (isValid) {
-                    std::string currentAddress = EncodeDestination(dest);
-                    scriptPubKey = GetScriptForDestination(dest);
-                }
-                coinbaseTx.vout[i].scriptPubKey = scriptPubKey;
-                coinbaseTx.vout[i].nValue = uplineReward;
-            }
-            }else{
-                throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s", __func__, "Invalid MLC Tree"));
-            }
-        }
-
-    }else{
-        mainminerReward = mainminerReward + mnReward;
+    if(timeNow < START_POS_BLOCK_V2){
         for (int i = 1; i < 11; i++) {
             if (KeyValue[i-1] != "") {
             coinbaseTx.vout.resize(i + 1);
@@ -522,7 +482,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         pblock->hashPrevBlock = hash;
     }
     UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-    pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
+    pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus(), false);
     pblock->nNonce         = 0;
     pblocktemplate->vTxSigOpsCost[0] = WITNESS_SCALE_FACTOR * GetLegacySigOpCount(*pblock->vtx[0]);
 

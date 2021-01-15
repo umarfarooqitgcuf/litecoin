@@ -409,10 +409,9 @@ static UniValue getdifficulty(const JSONRPCRequest& request)
 
     LOCK(cs_main);
     UniValue obj(UniValue::VOBJ);
-    obj.pushKV("proof-of-work", GetDifficulty(GetLastBlockIndex(pindexBestHeader, false)));
-    obj.pushKV("proof-of-stake", GetDifficulty(GetLastBlockIndex(pindexBestHeader, true)));
+    obj.pushKV("proof-of-work", GetDifficulty(GetLastBlockIndex(chainActive.Tip(), false)));
+    obj.pushKV("proof-of-stake", GetDifficulty(GetLastBlockIndex(chainActive.Tip(), true)));
     return obj;
-    //return GetDifficulty(chainActive.Tip());
 }
 
 static std::string EntryDescriptionString()

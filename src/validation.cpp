@@ -1610,6 +1610,51 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
     return true;
 }
 
+bool ReadBlockFromDiskPow(CBlock& block, const CDiskBlockPos& pos, const Consensus::Params& consensusParams)
+{
+    block.SetNull();
+
+    // Open history file to read
+    CAutoFile filein(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION);
+    if (filein.IsNull()) {
+        //std::cout<<"ReadBlockFromDiskPow: OpenBlockFile failed for\n";
+        return false;//error("ReadBlockFromDisk: OpenBlockFile failed for %s", pos.ToString());
+    }
+
+    // Read block
+    try {
+        filein >> block;
+    }
+    catch (const std::exception& e) {
+        return error("%s: Deserialize or I/O error - %s at %s", __func__, e.what(), pos.ToString());
+    }
+
+    // Check the header
+    if (block.IsProofOfWork()) {
+        if (!CheckProofOfWork(block.GetPoWHash(), block.nBits, consensusParams)) {
+            return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
+        }
+    }
+
+    return true;
+}
+
+bool ReadBlockFromDiskPow(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
+{
+    CDiskBlockPos blockPos;
+    {
+        LOCK(cs_main);
+        blockPos = pindex->GetBlockPos();
+    }
+
+    if (!ReadBlockFromDiskPow(block, blockPos, consensusParams))
+        return false;
+    if (block.GetHash() != pindex->GetBlockHash())
+        return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s",
+                pindex->ToString(), pindex->GetBlockPos().ToString());
+    return true;
+}
+
 bool ReadRawBlockFromDisk(std::vector<uint8_t>& block, const CDiskBlockPos& pos, const CMessageHeader::MessageStartChars& message_start)
 {
     CDiskBlockPos hpos = pos;
@@ -1711,7 +1756,7 @@ CAmount GetMasternodePosReward(int nHeight, CAmount blockValue)
     if (halvings >= 64)
         return 0;
 
-    CAmount masterReward =  9.50 * COIN;
+    CAmount masterReward =  29.50 * COIN;
     // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
     masterReward >>= halvings;
 
@@ -1733,7 +1778,7 @@ CAmount MagicBlockReward(int nHeight, CAmount blockValue)
     return magicReward;
 }
 
-CAmount UpLineReward(int nHeight, CAmount blockValue)
+CAmount UpLineReward(int nHeight)
 {
     const CChainParams& chainParams = Params();
 
@@ -1749,7 +1794,7 @@ CAmount UpLineReward(int nHeight, CAmount blockValue)
     return upLineReward;
 }
 
-CAmount MainMinerReward(int nHeight, CAmount blockValue)
+CAmount MainMinerReward(int nHeight)
 {
     const CChainParams& chainParams = Params();
 
@@ -1758,7 +1803,55 @@ CAmount MainMinerReward(int nHeight, CAmount blockValue)
     if (halvings >= 64)
         return 0;
 
-    CAmount minerReward =  30 * COIN;
+    CAmount minerReward =  39.5 * COIN;
+    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
+    minerReward >>= halvings;
+
+    return minerReward;
+}
+
+CAmount MinerRewardV2(int nHeight)
+{
+    const CChainParams& chainParams = Params();
+
+    int halvings = nHeight / chainParams.GetConsensus().nSubsidyHalvingInterval;
+    // Force block reward to zero when right shift is undefined.
+    if (halvings >= 64)
+        return 0;
+
+    CAmount minerReward =  59.50 * COIN;
+    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
+    minerReward >>= halvings;
+
+    return minerReward;
+}
+
+CAmount StakerRewardV2(int nHeight)
+{
+    const CChainParams& chainParams = Params();
+
+    int halvings = nHeight / chainParams.GetConsensus().nSubsidyHalvingInterval;
+    // Force block reward to zero when right shift is undefined.
+    if (halvings >= 64)
+        return 0;
+
+    CAmount minerReward =  10 * COIN;
+    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
+    minerReward >>= halvings;
+
+    return minerReward;
+}
+
+CAmount MasterRewardV2(int nHeight)
+{
+    const CChainParams& chainParams = Params();
+
+    int halvings = nHeight / chainParams.GetConsensus().nSubsidyHalvingInterval;
+    // Force block reward to zero when right shift is undefined.
+    if (halvings >= 64)
+        return 0;
+
+    CAmount minerReward =  29.50 * COIN;
     // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
     minerReward >>= halvings;
 
@@ -3784,6 +3877,8 @@ CBlockIndex* CChainState::AddToBlockIndex(const CBlockHeader& block)
 /** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
 void CChainState::ReceivedBlockTransactions(const CBlock& block, CBlockIndex* pindexNew, const CDiskBlockPos& pos, const Consensus::Params& consensusParams)
 {
+    if (block.IsProofOfStake())
+        pindexNew->SetProofOfStake();
     pindexNew->nTx = block.vtx.size();
     pindexNew->nChainTx = 0;
     pindexNew->nFile = pos.nFile;
@@ -3992,14 +4087,14 @@ bool CheckForMasternodePayment(const CTransaction& tx, const CBlockHeader& heade
     // Calculate total reward and find masternode payment txout
     CAmount totalReward = 0, masternodePayment = 0;
 
-    double uplineReward = UpLineReward(nHeight, totalReward);
+    double uplineReward = UpLineReward(nHeight);
     double mainminerReward;
     bool  ismagic = IsMagicBlock(nHeight);
     if (ismagic){
         totalReward = MagicBlockReward(nHeight, totalReward);
         totalReward = mainminerReward - (uplineReward * 10);
     }else {
-        totalReward = MainMinerReward(nHeight, totalReward);
+        totalReward = MainMinerReward(nHeight);
     }
 
 
@@ -4162,7 +4257,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, const Consensus::P
         if (block.IsProofOfStake()) {
         if (block.vtx[1]->vout.size() < 11 && nHeight > 490) {
             //std::cout<<"Block rejected.. ################"<<block.vtx[0]->vout.size() << ", Height of block: " << nHeight <<"\n";
-            return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "No MLC found in coinbase.");
+            return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "No MLC found in coinstake.");
         }
     }
         //std::cout<<"Block Accepted.. ################"<<block.vtx[0]->vout.size() << ", Height of block: " << nHeight<<"\n";
@@ -4186,7 +4281,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, const Consensus::P
         //mlc checking in coinstake transaction
         if (block.vtx[1]->vout.size() < 11 && nHeight > 450) {
             //std::cout<<"Block rejected.. ################"<<block.vtx[1]->vout.size() << ", Height of block: " << nHeight <<"\n";
-            return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "No MLC found in coinbase.");
+            return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "No MLC found in coinstake.");
         }
 
         //Don't allow contract opcodes in coinstake for safety
@@ -4197,9 +4292,11 @@ bool CheckBlock(const CBlock& block, CValidationState& state, const Consensus::P
     else if (block.IsProofOfWork()){
         //mlc checking in coinbase transaction
 
-        if (block.vtx[0]->vout.size() < 11 && nHeight > 450) {
-            //std::cout<<"Block rejected.. ################"<<block.vtx[0]->vout.size() << ", Height of block: " << nHeight <<"\n";
-            return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "No MLC found in coinbase.");
+        if (block.GetBlockTime() < START_POS_BLOCK_V2) {
+            if (block.vtx[0]->vout.size() < 11 && nHeight > 450) {
+                //std::cout<<"Block rejected.. ################"<<block.vtx[0]->vout.size() << ", Height of block: " << nHeight <<"\n";
+                return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false, "No MLC found in coinbase.");
+            }
         }
         //std::cout<<"Block Accepted.. ################"<<block.vtx[0]->vout.size() << ", Height of block: " << nHeight<<"\n";
         for (unsigned int i = 1; i < block.vtx.size(); i++)
@@ -4218,9 +4315,11 @@ bool CheckBlock(const CBlock& block, CValidationState& state, const Consensus::P
         }
     }
 
-    for (const auto &tx : block.vtx) {
-        if (!CheckForMasternodePayment(*tx, block)) {
-            return error("%s: CheckForMasternodePayment failed ", __func__);
+    if (block.IsProofOfStake()) {
+        for (const auto &tx : block.vtx) {
+            if (!CheckForMasternodePayment(*tx, block)) {
+                return error("%s: CheckForMasternodePayment failed ", __func__);
+            }
         }
     }
 
@@ -4481,7 +4580,7 @@ bool CChainState::AcceptBlockHeader(const CBlockHeader& block, CValidationState&
             return true;
         }
 
-        if (!CheckBlockHeader(block, state, chainparams.GetConsensus()))
+        if (!CheckBlockHeader(block, state, chainparams.GetConsensus(), false))
             return error("%s: Consensus::CheckBlockHeader: %s, %s", __func__, hash.ToString(), FormatStateMessage(state));
 
         // Get prev block index
@@ -4633,9 +4732,7 @@ bool CChainState::AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CVali
 
     if (block.nTime >= START_POS_BLOCK) {
         if (pindex) {
-            std::cout << "means pindex in validation.cpp\n";
             if (!CheckWork(block, pindex)) {
-                std::cout << "block check work in validation.cpp\n";
                 return false;
             }
         }

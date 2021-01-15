@@ -144,6 +144,8 @@ static const int64_t MAX_FEE_ESTIMATION_TIP_AGE = 3 * 60 * 60;
 
 #define START_MASTERNODE_PAYMENTS 1610172000
 #define START_POS_BLOCK 1610172000
+#define START_POS_BLOCK_V2 1610549709
+#define START_MASTERNODE_PAYMENTS_V2 1610549709
 static const int64_t DARKSEND_COLLATERAL = (10000*COIN); //10000 XLT
 static const int64_t DARKSEND_FEE = (0.002*COIN); // reward masternode
 static const int64_t DARKSEND_POOL_MAX = (1999999.99*COIN);
@@ -344,9 +346,15 @@ CAmount GetMasternodePosReward(int nHeight, CAmount blockValue);
 
 CAmount MagicBlockReward(int nHeight, CAmount blockValue);
 
-CAmount UpLineReward(int nHeight, CAmount blockValue);
+CAmount UpLineReward(int nHeight);
 
-CAmount MainMinerReward(int nHeight, CAmount blockValue);
+CAmount MainMinerReward(int nHeight);
+
+CAmount MinerRewardV2(int nHeight);
+
+CAmount StakerRewardV2(int nHeight);
+
+CAmount MasterRewardV2(int nHeight);
 
 bool IsMagicBlock(int nHeight);
 
@@ -546,6 +554,8 @@ void InitScriptExecutionCache();
 /** Functions for disk access for blocks */
 bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus::Params& consensusParams);
 bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
+bool ReadBlockFromDiskPow(CBlock& block, const CDiskBlockPos& pos, const Consensus::Params& consensusParams);
+bool ReadBlockFromDiskPow(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
 bool ReadRawBlockFromDisk(std::vector<uint8_t>& block, const CDiskBlockPos& pos, const CMessageHeader::MessageStartChars& message_start);
 bool ReadRawBlockFromDisk(std::vector<uint8_t>& block, const CBlockIndex* pindex, const CMessageHeader::MessageStartChars& message_start);
 

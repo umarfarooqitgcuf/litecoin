@@ -1344,35 +1344,35 @@ bool Stake::CreateCoinStake(CWallet* wallet, const CKeyStore& keystore, unsigned
         std::string currentAddress = EncodeDestination(dest);
         scriptPubKey_main = GetScriptForDestination(dest);
     }
-
+    int64_t timeNow = GetTime();
+    bool  ismagic = IsMagicBlock(pIndex0->nHeight);
 
     // Calculate reward
     double mlcDistribution = ((GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus()) * 33.34) / 100 ) / COIN;
-    double uplineReward = UpLineReward(pIndex0->nHeight, GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus()));
+    double uplineReward = UpLineReward(pIndex0->nHeight);
     double mainminerReward;
-    bool  ismagic = IsMagicBlock(pIndex0->nHeight);
-    if (ismagic){
-        mainminerReward = /*nFees +*/ MagicBlockReward(pIndex0->nHeight, GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus()));
-        mainminerReward = mainminerReward - (uplineReward * 10);
-    }else {
-        mainminerReward = /*nFees +*/ MainMinerReward(pIndex0->nHeight, GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus()));
-    }
-    CAmount mnReward = GetMasternodePosReward(pIndex0->nHeight, GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus()));
 
-
-    uint32_t nposstarttime = START_POS_BLOCK;
-    int64_t timeNow = GetTime();
-    if (timeNow > nposstarttime ){
+    if (timeNow > START_POS_BLOCK ){
+        mainminerReward = MainMinerReward(pIndex0->nHeight);
+        if (timeNow > START_POS_BLOCK_V2){
+            mainminerReward = /*nFees +*/ StakerRewardV2(pIndex0->nHeight);
+        }
     }else{
-        double mainminerReward = (GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus())) - (mlcDistribution * COIN);
+        mainminerReward = (GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus())) - (mlcDistribution * COIN);
         double subsidy = (GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus()) * 33.34 / 100 ) / COIN;
         uplineReward = (subsidy * 10) /100 ;
     }
+    if (ismagic){
+        mainminerReward = /*nFees +*/ MagicBlockReward(pIndex0->nHeight, GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus()));
+        mainminerReward = mainminerReward - (uplineReward * 10);
+    }
+    CAmount mnReward = GetMasternodePosReward(pIndex0->nHeight, GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus()));
+
     nCredit += mainminerReward;
     CAmount nMinFee = 0;
     CScript payeeScript;
     if (SelectMasternodePayee(payeeScript)) {
-        nCredit = nCredit - mnReward;
+        //nCredit = nCredit - mnReward;
         txNew.vout.resize(2 + 1);
         CTxDestination txDest;
         ExtractDestination(payeeScript, txDest);
@@ -1443,129 +1443,6 @@ bool Stake::CreateCoinStake(CWallet* wallet, const CKeyStore& keystore, unsigned
     txNew.vout[1].scriptPubKey = scriptPubKey_main;
     txNew.vout[1].nValue = nCredit;
 
-
-    /*while (true) {
-        // Set output amount
-        if (txNew.vout.size() == 3) {
-            std::cout<<"is that runs equals 3\n";
-            txNew.vout[1].nValue = ((nCredit - nMinFee) / 2 / CENT) * CENT;
-            txNew.vout[2].nValue = nCredit - nMinFee - txNew.vout[1].nValue;
-        } else {
-            std::cout<<"or that one in else not equal 3\n";
-            txNew.vout[1].nValue = nCredit - nMinFee;
-        }
-        // Limit size
-        unsigned int nBytes = ::GetSerializeSize(txNew, SER_NETWORK);
-        if (nBytes >= DEFAULT_BLOCK_MAX_WEIGHT / 5) {
-            return error("%s: exceeded coinstake size limit", __func__);
-            std::cout<<"exceeded coinstake size limit\n";
-        }
-        break;
-    }
-    int numout = 0;
-    CScript payeeScript;
-    bool hasMasternodePayment = SelectMasternodePayee(payeeScript);
-    CAmount blockValue = nCredit;
-    CAmount masternodePayment = GetMasternodePosReward(chainActive.Height() + 1, nReward);*/
-
-
-    /*if (hasMasternodePayment) {
-        numout = txNew.vout.size();
-
-        txNew.vout.resize(numout + 1);
-
-        txNew.vout[numout].scriptPubKey = payeeScript;
-        txNew.vout[numout].nValue = masternodePayment;
-        //blockValue -= masternodePayment;
-
-        CTxDestination txDest;
-        ExtractDestination(payeeScript, txDest);
-        if (fDebug) LogPrintf("%s: Masternode payment to %s (pos)\n", __func__, EncodeDestination(txDest));
-        // Set output amount, with space for the devfee
-        if (txNew.vout.size() == 4) { // 2 stake outputs, stake was split, plus a masternode payment, no devfee payment yet
-            txNew.vout[1].nValue = (blockValue / 2 / CENT) * CENT;
-            txNew.vout[2].nValue = blockValue - txNew.vout[1].nValue;
-        } else if (txNew.vout.size() == 3) { // only 1 stake output, was not split, plus a masternode payment, no devfee payment yet
-            txNew.vout[1].nValue = blockValue;
-        }
-
-    } else {
-        blockValue += masternodePayment;
-        if (txNew.vout.size() == 3) { // 2 stake outputs, stake was split, no masternode payment, no devfee payment yet
-            txNew.vout[1].nValue = (blockValue / 2 / CENT) * CENT;
-            txNew.vout[2].nValue = blockValue - txNew.vout[1].nValue;
-        } else if (txNew.vout.size() == 2) { // only 1 stake output, was not split, no masternode payment, no devfee payment yet
-            txNew.vout[1].nValue = blockValue;
-        }
-    }
-    std::string this_is_my_key="";
-    std::vector <std::string> KeyValue;
-
-    std::string std_data_dir = GetDataDir().string();
-    //my key db
-    leveldb::DB *db_my;
-    leveldb::Options options_my;
-    options_my.create_if_missing = true;
-    //mlc db
-    leveldb::DB *db;
-    leveldb::Options options;
-    options.create_if_missing = true;
-    std::string value_sponser_up;
-
-    //open db.
-    if(this_is_my_key==""){
-        leveldb::Status status_own = leveldb::DB::Open(options_my, std_data_dir + "/myKey", &db_my);
-        std::string StringKey = "StringKey";
-        std::string value_my;
-        if (status_own.ok()) status_own = db_my->Get(leveldb::ReadOptions(), StringKey, &value_my);
-        //std::cout<<"my value="<<value_my<<"\n";
-        if(value_my !="") {
-            this_is_my_key = value_my;
-
-            leveldb::Status status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
-            for (int i = 1; i < 11; ++i) {
-                value_sponser_up = "";
-                if (status.ok()) status = db->Get(leveldb::ReadOptions(), value_my, &value_sponser_up);
-                if (value_sponser_up == "") {
-                } else {
-                    //std::cout<<"value sponser=="<<value_sponser_up<<"\n";
-                    KeyValue.push_back(value_sponser_up);
-                    value_my = value_sponser_up;
-                }
-            }
-        }
-        delete db_my;
-        delete db;
-    }
-
-    for (int i = 2; i < 12; i++) {
-        //if (KeyValue[i-1] != "") {
-        coinbaseTx.vout.resize(i + 1);
-        CTxDestination dest = DecodeDestination("MDB5cfkxNo6dNT5dqguf9hvpzoTXVPupqa");
-        std::string wallet_name = ;
-        if(mlc_wallet_name == ""){
-            wallet_name = "";
-        }else{
-            wallet_name = mlc_wallet_name;
-        }
-        std::shared_ptr <CWallet> wallet = GetWallet(wallet_name);
-        isminetype mine = IsMine(*wallet, dest);
-        if (bool(mine & ISMINE_SPENDABLE) == 1){
-            throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s", __func__, "Invalid MLC Tree"));
-        }else{
-            bool isValid = IsValidDestination(dest);
-            CScript scriptPubKey;
-            if (isValid) {
-                std::string currentAddress = EncodeDestination(dest);
-                scriptPubKey = GetScriptForDestination(dest);
-            }
-            coinbaseTx.vout[i].scriptPubKey = scriptPubKey;
-            coinbaseTx.vout[i].nValue = uplineReward;
-        }
-        *//*}else{
-            throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s", __func__, "Invalid MLC Tree"));
-        }*//*
-    }*/
     // Check vout values.
     unsigned i = 0;
     for (auto& vout : txNew.vout) {
@@ -1684,7 +1561,7 @@ void Stake::StakingThread(CWallet* wallet, CConnman* connman) {
         unsigned int extra = 0;
         while (!nStakingInterrupped && !ShutdownRequested()) {
             std::size_t nNodes = 0;
-            bool nCanStake = true;//!IsInitialBlockDownload();
+            bool nCanStake = !IsInitialBlockDownload();
 
             boost::this_thread::interruption_point();
 

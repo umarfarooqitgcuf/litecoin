@@ -350,7 +350,7 @@ public:
             return;
         }
 
-        LogPrintf("CDarkSendPool::UpdateState() == %d | %d \n", state, newState);
+        //LogPrintf("CDarkSendPool::UpdateState() == %d | %d \n", state, newState);
         if(state != newState){
             lastTimeChanged = GetTimeMillis();
             if(fMasterNode) {

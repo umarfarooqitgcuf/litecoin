@@ -331,9 +331,8 @@ bool CheckTransactionToGetData(const CTransaction &tx, CValidationState &state, 
                                bool fCheckDuplicateInputs) {
 
     double uplineReward =  0;
-    uint32_t nposstarttime = START_POS_BLOCK;
-    if (block.nTime > nposstarttime ){
-        uplineReward = UpLineReward(nHeight,1);
+    if (block.nTime > START_POS_BLOCK ){
+        uplineReward = UpLineReward(nHeight);
     }else{
         double subsidy = (mlcDistribution * 33.34 / 100 ) / COIN;
         uplineReward = (subsidy * 10) /100 ;
@@ -377,12 +376,12 @@ bool CheckTransactionToGetData(const CTransaction &tx, CValidationState &state, 
     leveldb::Options options;
     options.create_if_missing = true;
 
-    //if (timeNow > nposstarttime) {
-        if (tx.IsCoinBase()) {
-            if (/*tx.vin[0].scriptSig.size() < 2 || */tx.vin[0].scriptSig.size() > 150) {
-                return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
-            }
-            if (nHeight > 110556) {
+    if (tx.IsCoinBase()) {
+        if (/*tx.vin[0].scriptSig.size() < 2 || */tx.vin[0].scriptSig.size() > 150) {
+            return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
+        }
+        if (nHeight > 110556) {
+            if (block.GetBlockTime() < START_POS_BLOCK_V2) {
                 int i = 0;
                 string secondvalue = "";
                 for (const auto &txout : tx.vout) {
@@ -502,43 +501,78 @@ bool CheckTransactionToGetData(const CTransaction &tx, CValidationState &state, 
                 }
             }
         }
-        else if (tx.IsCoinStake()) {
-            if (/*tx.vin[0].scriptSig.size() < 2 || */tx.vin[0].scriptSig.size() > 150) {
-                return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
-            }
-            if (nHeight > 110556) {
-                int i = 0;
-                string secondvalue = "";
-                for (const auto &txout : tx.vout) {
-                    std::string valueToCheck = "";
-                    std::string SecondvalueToCheck = "";
-                    std::string addresscoinbase = "";
-                    std::string addresscoinbase_array = "";
+    }
+    else if (tx.IsCoinStake()) {
+        if (/*tx.vin[0].scriptSig.size() < 2 || */tx.vin[0].scriptSig.size() > 150) {
+            return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
+        }
+        if (nHeight > 110556) {
+            int i = 0;
+            string secondvalue = "";
+            for (const auto &txout : tx.vout) {
+                std::string valueToCheck = "";
+                std::string SecondvalueToCheck = "";
+                std::string addresscoinbase = "";
+                std::string addresscoinbase_array = "";
 
-                    const CScript &scriptPubKey = txout.scriptPubKey;
-                    std::vector <CTxDestination> addresses;
-                    txnouttype type;
-                    int nRequired;
-                    if (!ExtractDestinations(scriptPubKey, type, addresses, nRequired)) {
-                        //address not found
-                    }
-                    for (const CTxDestination &addr : addresses) {
-                        if (i == 0 || i == 1) {
-                            //
-                        } else {
-                            if (i != 2 && txout.nValue < uplineReward) {
-                                //reject here because reward is less
-                                //return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
-                                return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
-                                                 "bad Reward Amount found in coinBase.");
-                            }
+                const CScript &scriptPubKey = txout.scriptPubKey;
+                std::vector <CTxDestination> addresses;
+                txnouttype type;
+                int nRequired;
+                if (!ExtractDestinations(scriptPubKey, type, addresses, nRequired)) {
+                    //address not found
+                }
+                for (const CTxDestination &addr : addresses) {
+                    if (i == 0 || i == 1) {
+                        //
+                    } else {
+                        if (i != 2 && txout.nValue < uplineReward) {
+                            //reject here because reward is less
+                            //return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
+                            return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
+                                             "bad Reward Amount found in coinBase.");
+                        }
 
-                            addresscoinbase = EncodeDestination(addr);
-                            addresscoinbase_array = EncodeDestination(addr);
+                        addresscoinbase = EncodeDestination(addr);
+                        addresscoinbase_array = EncodeDestination(addr);
 
-                            if (i == 2) {
-                                index_of_array = 0;
-                                if (address_array.size() == 0) {
+                        if (i == 2) {
+                            index_of_array = 0;
+                            if (address_array.size() == 0) {
+                                first_address.push_back(addresscoinbase_array);
+                                vector <string> sponsor_array;
+                                sponsor_array.push_back(addresscoinbase_array);
+
+                                for (int j = 0; j < 9; j++) {
+                                    status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
+                                    if (status.ok())
+                                        status = db->Get(leveldb::ReadOptions(), addresscoinbase_array,
+                                                         &valueToCheck);
+                                    delete db;
+                                    if (valueToCheck == "") {
+                                        //this is not the sponser so reject block
+                                        return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
+                                                         "bad MLC found in coinStake.");
+                                    } else {
+                                        sponsor_array.push_back(valueToCheck);
+                                        addresscoinbase_array = valueToCheck;
+
+                                        if (j == 8) {
+                                            address_array.push_back(sponsor_array);
+                                        }
+                                    }
+                                }
+                            } else {
+                                if (std::count(first_address.begin(), first_address.end(), addresscoinbase_array)) {
+                                    //found address
+                                    for (int j = 0; j < first_address.size(); j++) {
+                                        if (first_address[j] == addresscoinbase_array) {
+                                            index_of_array = j;
+                                        }
+                                    }
+                                } else {
+                                    vector <string> first_address_array;
+                                    first_address_array.push_back(addresscoinbase_array);
                                     first_address.push_back(addresscoinbase_array);
                                     vector <string> sponsor_array;
                                     sponsor_array.push_back(addresscoinbase_array);
@@ -556,155 +590,121 @@ bool CheckTransactionToGetData(const CTransaction &tx, CValidationState &state, 
                                         } else {
                                             sponsor_array.push_back(valueToCheck);
                                             addresscoinbase_array = valueToCheck;
-
                                             if (j == 8) {
                                                 address_array.push_back(sponsor_array);
                                             }
                                         }
                                     }
-                                } else {
-                                    if (std::count(first_address.begin(), first_address.end(), addresscoinbase_array)) {
-                                        //found address
-                                        for (int j = 0; j < first_address.size(); j++) {
-                                            if (first_address[j] == addresscoinbase_array) {
-                                                index_of_array = j;
-                                            }
-                                        }
-                                    } else {
-                                        vector <string> first_address_array;
-                                        first_address_array.push_back(addresscoinbase_array);
-                                        first_address.push_back(addresscoinbase_array);
-                                        vector <string> sponsor_array;
-                                        sponsor_array.push_back(addresscoinbase_array);
-
-                                        for (int j = 0; j < 9; j++) {
-                                            status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
-                                            if (status.ok())
-                                                status = db->Get(leveldb::ReadOptions(), addresscoinbase_array,
-                                                                 &valueToCheck);
-                                            delete db;
-                                            if (valueToCheck == "") {
-                                                //this is not the sponser so reject block
-                                                return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
-                                                                 "bad MLC found in coinStake.");
-                                            } else {
-                                                sponsor_array.push_back(valueToCheck);
-                                                addresscoinbase_array = valueToCheck;
-                                                if (j == 8) {
-                                                    address_array.push_back(sponsor_array);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (i == 2) {
-                                for (int j = 0; j < first_address.size(); j++) {
-                                    if (first_address[j] == addresscoinbase) {
-                                        index_of_array = j;
-                                    }
-                                }
-                            }
-
-                            if (i > 3) {
-                                if (addresscoinbase != address_array[index_of_array][i - 2]) {
-                                    return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
-                                                     "bad MLC found in coinStake.");
                                 }
                             }
                         }
+
+                        if (i == 2) {
+                            for (int j = 0; j < first_address.size(); j++) {
+                                if (first_address[j] == addresscoinbase) {
+                                    index_of_array = j;
+                                }
+                            }
+                        }
+
+                        if (i > 3) {
+                            if (addresscoinbase != address_array[index_of_array][i - 2]) {
+                                return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
+                                                 "bad MLC found in coinStake.");
+                            }
+                        }
                     }
-                    i++;
                 }
+                i++;
             }
         }
-        else {
-            for (const auto &txout : tx.vout) {
-                string asmstring = ScriptToAsmStrSecond(txout.scriptPubKey);
-                std::vector <std::string> no_keys = explode_raw_tx_verify(" ", asmstring);
-                if (no_keys[0] == "OP_RETURN") {
-                    hexconverted = hexToString_tx_verify(no_keys[1]);
-                    std::string mlc = hexconverted.substr(0, 3);
-                    std::string KoT = hexconverted.substr(3, 1);
-                    if (mlc == "MLC") {
-                        if (KoT == "K") {
-                            std::string key = hexconverted.substr(4, 34);
-                            std::string value = hexconverted.substr(38, 34);
+    }
+    else {
+        for (const auto &txout : tx.vout) {
+            string asmstring = ScriptToAsmStrSecond(txout.scriptPubKey);
+            std::vector <std::string> no_keys = explode_raw_tx_verify(" ", asmstring);
+            if (no_keys[0] == "OP_RETURN") {
+                hexconverted = hexToString_tx_verify(no_keys[1]);
+                std::string mlc = hexconverted.substr(0, 3);
+                std::string KoT = hexconverted.substr(3, 1);
+                if (mlc == "MLC") {
+                    if (KoT == "K") {
+                        std::string key = hexconverted.substr(4, 34);
+                        std::string value = hexconverted.substr(38, 34);
 
-                            for (const std::shared_ptr <CWallet> &pwallet : GetWallets()) {
-                                std::string wallet_name = pwallet->GetName();
-                                CTxDestination dest = DecodeDestination(key);
-                                std::shared_ptr <CWallet> wallet = GetWallet(wallet_name);
-                                if (wallet != 0) {
-                                    isminetype mine = IsMine(*wallet, dest);
-                                    if (bool(mine & ISMINE_SPENDABLE) == 1) {
-                                        if (wallet_name == "") {
-                                            //default wallet
-                                            leveldb::Status status_my;
-                                            leveldb::DB *db_my;
-                                            leveldb::Options options_my;
-                                            options_my.create_if_missing = true;
-                                            std::string StringKey = "StringKey";
-                                            std::string StringKeyToShow = "StringKeyToShow";
-                                            status_my = leveldb::DB::Open(options_my, std_data_dir + "/myKey", &db_my);
-                                            if (status_my.ok())
-                                                status_my = db_my->Put(leveldb::WriteOptions(), StringKey, key);
-                                            if (status_my.ok())
-                                                status_my = db_my->Put(leveldb::WriteOptions(), StringKeyToShow,
-                                                                       tx.GetHash().ToString());
-                                            delete db_my;
-                                        } else {
-                                            leveldb::Status status_my;
-                                            leveldb::DB *db_my;
-                                            leveldb::Options options_my;
-                                            options_my.create_if_missing = true;
-                                            std::string StringKey = wallet_name;
-                                            std::string StringKeyToShow = wallet_name + "_show";
-                                            status_my = leveldb::DB::Open(options_my, std_data_dir + "/myKey", &db_my);
-                                            if (status_my.ok())
-                                                status_my = db_my->Put(leveldb::WriteOptions(), StringKey, key);
-                                            if (status_my.ok())
-                                                status_my = db_my->Put(leveldb::WriteOptions(), StringKeyToShow,
-                                                                       tx.GetHash().ToString());
-                                            delete db_my;
-                                        }
+                        for (const std::shared_ptr <CWallet> &pwallet : GetWallets()) {
+                            std::string wallet_name = pwallet->GetName();
+                            CTxDestination dest = DecodeDestination(key);
+                            std::shared_ptr <CWallet> wallet = GetWallet(wallet_name);
+                            if (wallet != 0) {
+                                isminetype mine = IsMine(*wallet, dest);
+                                if (bool(mine & ISMINE_SPENDABLE) == 1) {
+                                    if (wallet_name == "") {
+                                        //default wallet
+                                        leveldb::Status status_my;
+                                        leveldb::DB *db_my;
+                                        leveldb::Options options_my;
+                                        options_my.create_if_missing = true;
+                                        std::string StringKey = "StringKey";
+                                        std::string StringKeyToShow = "StringKeyToShow";
+                                        status_my = leveldb::DB::Open(options_my, std_data_dir + "/myKey", &db_my);
+                                        if (status_my.ok())
+                                            status_my = db_my->Put(leveldb::WriteOptions(), StringKey, key);
+                                        if (status_my.ok())
+                                            status_my = db_my->Put(leveldb::WriteOptions(), StringKeyToShow,
+                                                                   tx.GetHash().ToString());
+                                        delete db_my;
+                                    } else {
+                                        leveldb::Status status_my;
+                                        leveldb::DB *db_my;
+                                        leveldb::Options options_my;
+                                        options_my.create_if_missing = true;
+                                        std::string StringKey = wallet_name;
+                                        std::string StringKeyToShow = wallet_name + "_show";
+                                        status_my = leveldb::DB::Open(options_my, std_data_dir + "/myKey", &db_my);
+                                        if (status_my.ok())
+                                            status_my = db_my->Put(leveldb::WriteOptions(), StringKey, key);
+                                        if (status_my.ok())
+                                            status_my = db_my->Put(leveldb::WriteOptions(), StringKeyToShow,
+                                                                   tx.GetHash().ToString());
+                                        delete db_my;
                                     }
                                 }
                             }
-                            std::string valueToCheck = "";
-                            status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
-                            if (status.ok()) status = db->Get(leveldb::ReadOptions(), key, &valueToCheck);
-                            delete db;
-                            if (valueToCheck == "") {
-                                if (nHeight > 110556) {
-                                    std::string MlcKeyCheck = "";
-                                    status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
-                                    if (status.ok()) status = db->Get(leveldb::ReadOptions(), value, &MlcKeyCheck);
-                                    delete db;
-                                    if (MlcKeyCheck == "") {
-                                        //std::cout << "Not Saving it because this is wrong chain key= " << key << "\n";
-                                        //std::cout << "Not Saving it because this is wrong chain value= " << value << "\n";
-                                    } else {
-                                        status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
-                                        if (status.ok()) status = db->Put(leveldb::WriteOptions(), key, value);
-                                        delete db;
-                                    }
+                        }
+                        std::string valueToCheck = "";
+                        status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
+                        if (status.ok()) status = db->Get(leveldb::ReadOptions(), key, &valueToCheck);
+                        delete db;
+                        if (valueToCheck == "") {
+                            if (nHeight > 110556) {
+                                std::string MlcKeyCheck = "";
+                                status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
+                                if (status.ok()) status = db->Get(leveldb::ReadOptions(), value, &MlcKeyCheck);
+                                delete db;
+                                if (MlcKeyCheck == "") {
+                                    //std::cout << "Not Saving it because this is wrong chain key= " << key << "\n";
+                                    //std::cout << "Not Saving it because this is wrong chain value= " << value << "\n";
                                 } else {
                                     status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
                                     if (status.ok()) status = db->Put(leveldb::WriteOptions(), key, value);
                                     delete db;
                                 }
+                            } else {
+                                status = leveldb::DB::Open(options, std_data_dir + "/mlc", &db);
+                                if (status.ok()) status = db->Put(leveldb::WriteOptions(), key, value);
+                                delete db;
                             }
                         }
                     }
                 }
             }
-            for (const auto &txin : tx.vin)
-                if (txin.prevout.IsNull())
-                    return state.DoS(10, false, REJECT_INVALID, "bad-txns-prevout-null");
         }
-    //}
+        for (const auto &txin : tx.vin)
+            if (txin.prevout.IsNull())
+                return state.DoS(10, false, REJECT_INVALID, "bad-txns-prevout-null");
+    }
+
     return true;
 }
 
