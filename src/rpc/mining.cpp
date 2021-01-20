@@ -238,7 +238,7 @@ static UniValue getmininginfo(const JSONRPCRequest& request)
     obj.pushKV("blocks",           (int)chainActive.Height());
     if (BlockAssembler::m_last_block_weight) obj.pushKV("currentblockweight", *BlockAssembler::m_last_block_weight);
     if (BlockAssembler::m_last_block_num_txs) obj.pushKV("currentblocktx", *BlockAssembler::m_last_block_num_txs);
-    obj.pushKV("difficulty_pow",       (double)GetDifficulty(GetLastBlockIndex(chainActive.Tip(), false)));
+    obj.pushKV("difficulty",       (double)GetDifficulty(GetLastBlockIndex(chainActive.Tip(), false)));
     obj.pushKV("difficulty_pos",       (double)GetDifficulty(GetLastBlockIndex(chainActive.Tip(), true)));
     obj.pushKV("networkhashps",    getnetworkhashps(request));
     obj.pushKV("pooledtx",         (uint64_t)mempool.size());
@@ -404,18 +404,8 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
     if(!dbCheck){
         throw JSONRPCError(RPC_WALLET_ERROR, "Your sponsor key is not added. Kindly add it using console command <addmlckeyraw sponsor_key>.");
     }
-    std::string capabilities="";
-    if (!request.params[0].isNull())
-    {
-        const UniValue& oparamone = request.params[0].get_obj();
-        const UniValue& modevalone = find_value(oparamone, "capabilities");
-        if (modevalone.isStr()) {
-            if(modevalone.get_str() == "mlccoinbasetxn" ){
-                capabilities= modevalone.get_str();
-            }
-        }
-    }
-
+    std::string capabilities="mlccoinbasetxn";
+    
     LOCK(cs_main);
 
     std::string strMode = "template";
