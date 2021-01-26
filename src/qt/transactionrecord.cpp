@@ -51,6 +51,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const interface
 
                 sub.idx = i; // vout index
                 if(wtx.is_coinstake){
+                    sub.address = EncodeDestination(wtx.txout_address[i]);
                     if(i == 1){
                         sub.credit = nNet;
                         sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
