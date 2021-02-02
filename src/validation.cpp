@@ -4732,7 +4732,7 @@ bool CChainState::AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CVali
 
     if (block.nTime >= START_POS_BLOCK) {
         if (pindex) {
-            if (!CheckWork(block, pindex)) {
+            if (!CheckWork(block, pindex->pprev)) {
                 return false;
             }
         }
