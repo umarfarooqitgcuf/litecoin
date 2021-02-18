@@ -71,6 +71,7 @@ extern volatile bool fReopenDebugLog;
 int64_t GetStartupTime();
 
 extern const char * const BITCOIN_CONF_FILENAME;
+extern const char * const MASTER_CONF_FILENAME;
 
 /** Translate a message to the native language of the user. */
 const extern std::function<std::string(const char*)> G_TRANSLATION_FUN;

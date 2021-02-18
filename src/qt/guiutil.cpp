@@ -402,6 +402,29 @@ bool openBitcoinConf()
     return res;
 }
 
+void openMNConfigfile()
+{
+    fs::path pathConfig = GetConfigFile(gArgs.GetArg("-conf", MASTER_CONF_FILENAME));
+
+    /* Create the file */
+    fsbridge::ofstream configFile(pathConfig, std::ios_base::app);
+
+    if (!configFile.good())
+        return;
+
+    configFile.close();
+
+    /* Open bitcoin.conf with the associated application */
+    bool res = QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(pathConfig)));
+#ifdef Q_OS_MAC
+    // Workaround for macOS-specific behavior; see #15409.
+    if (!res) {
+        res = QProcess::startDetached("/usr/bin/open", QStringList{"-t", boostPathToQString(pathConfig)});
+    }
+#endif
+    return;
+}
+
 ToolTipToRichTextFilter::ToolTipToRichTextFilter(int _size_threshold, QObject *parent) :
     QObject(parent),
     size_threshold(_size_threshold)

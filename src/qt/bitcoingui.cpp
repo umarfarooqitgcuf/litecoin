@@ -321,6 +321,10 @@ void BitcoinGUI::createActions()
     quitAction->setStatusTip(tr("Quit application"));
     quitAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Q));
     quitAction->setMenuRole(QAction::QuitRole);
+
+    openMNConfEditorAction = new QAction(platformStyle->TextColorIcon(":/icons/edit"), tr("Open &Masternode Configuration File"), this);
+    openMNConfEditorAction->setStatusTip(tr("Open Masternode configuration file"));
+
     aboutAction = new QAction(platformStyle->TextColorIcon(":/icons/about"), tr("&About %1").arg(PACKAGE_NAME), this);
     aboutAction->setStatusTip(tr("Show information about %1").arg(PACKAGE_NAME));
     aboutAction->setMenuRole(QAction::AboutRole);
@@ -386,7 +390,7 @@ void BitcoinGUI::createActions()
     connect(masternodeAction, SIGNAL(triggered()), this, SLOT(gotoMasternodePage()));
     connect(smartContractAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(smartContractAction, SIGNAL(triggered()), this, SLOT(gotoSmartContractPage()));
-
+    connect(openMNConfEditorAction, SIGNAL(triggered()), rpcConsole, SLOT(showMNConfEditor()));
 
 #ifdef ENABLE_WALLET
     if(walletFrame)
@@ -487,6 +491,7 @@ void BitcoinGUI::createMenuBar()
     {
         settings->addAction(encryptWalletAction);
         settings->addAction(changePassphraseAction);
+        settings->addAction(openMNConfEditorAction);
         settings->addSeparator();
     }
     settings->addAction(optionsAction);
@@ -801,6 +806,7 @@ void BitcoinGUI::createTrayIconMenu()
         trayIconMenu->addAction(verifyMessageAction);
         trayIconMenu->addSeparator();
         trayIconMenu->addAction(openRPCConsoleAction);
+        trayIconMenu->addAction(openMNConfEditorAction);
     }
     trayIconMenu->addAction(optionsAction);
 #ifndef Q_OS_MAC // This is built-in on macOS

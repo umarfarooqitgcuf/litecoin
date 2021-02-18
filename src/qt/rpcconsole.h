@@ -94,6 +94,8 @@ private Q_SLOTS:
     void showOrHideBanTableIfRequired();
     /** clear the selected node */
     void clearSelectedNode();
+    /** Open external (default) editor with masternode.conf */
+    void showMNConfEditor();
 
 public Q_SLOTS:
     void clear(bool clearHistory = true);

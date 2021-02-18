@@ -154,6 +154,7 @@ private:
     QAction* m_close_wallet_action{nullptr};
     QAction* m_wallet_selector_label_action = nullptr;
     QAction* m_wallet_selector_action = nullptr;
+    QAction* openMNConfEditorAction = nullptr;
 
     QLabel *m_wallet_selector_label = nullptr;
     QComboBox* m_wallet_selector = nullptr;

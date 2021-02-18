@@ -772,6 +772,11 @@ void RPCConsole::fontBigger()
     setFontSize(consoleFontSize+1);
 }
 
+void RPCConsole::showMNConfEditor()
+{
+    GUIUtil::openMNConfigfile();
+}
+
 void RPCConsole::fontSmaller()
 {
     setFontSize(consoleFontSize-1);

@@ -88,6 +88,7 @@ std::vector<int64_t> darkSendDenominations;
 const int64_t nStartupTime = GetTime();
 
 const char * const BITCOIN_CONF_FILENAME = "nexalt.conf";
+const char * const MASTER_CONF_FILENAME = "masternode.conf";
 
 ArgsManager gArgs;
 
