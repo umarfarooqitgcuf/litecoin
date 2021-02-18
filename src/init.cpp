@@ -522,9 +522,15 @@ void SetupServerArgs()
     gArgs.AddArg("-printtoconsole", "Send trace/debug info to console (default: 1 when no -daemon. To disable logging to file, set -nodebuglogfile)", false, OptionsCategory::DEBUG_TEST);
     gArgs.AddArg("-shrinkdebugfile", "Shrink debug.log file on client startup (default: 1 when no -debug)", false, OptionsCategory::DEBUG_TEST);
     gArgs.AddArg("-uacomment=<cmt>", "Append comment to the user agent string", false, OptionsCategory::DEBUG_TEST);
-    //gArgs.AddArg("-staking", "Stake your coins to support network and gain reward(default: %s)", DEFAULT_STAKE , OptionsCategory::OPTIONS);
     gArgs.AddArg("-staking", strprintf("Stake your coins to support network and gain reward(default: %s)", DEFAULT_STAKE), true , OptionsCategory::OPTIONS);
 
+    gArgs.AddArg("-masternode", strprintf("Enable the client to act as a masternode (0-1, default: %u)", 0), true, OptionsCategory::OPTIONS);
+    gArgs.AddArg("-mnconf=<file>", strprintf("Specify masternode configuration file (default: %s)", "masternode.conf"), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("-mnconflock=<n>", strprintf("Lock masternodes from masternode configuration file (default: %u)", 0), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("-masternodeprivkey=<n>", strprintf("Set the masternode private key"), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("-masternodeaddr=<n>", strprintf("Set external address:port to get to this masternode (example: %s)" , "128.127.106.235:51472"), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("-budgetvotemode=<mode>", strprintf("Change automatic finalized budget voting behavior. mode=auto: Vote for only exact "
+                                                     "finalized budget match to my generated budget. (string, default: auto)"), false, OptionsCategory::OPTIONS);
     SetupChainParamsBaseOptions();
 
     gArgs.AddArg("-acceptnonstdtxn", strprintf("Relay and mine \"non-standard\" transactions (%sdefault: %u)", "testnet/regtest only; ", !testnetChainParams->RequireStandard()), true, OptionsCategory::NODE_RELAY);

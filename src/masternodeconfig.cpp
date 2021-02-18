@@ -57,7 +57,7 @@ bool CMasternodeConfig::read(std::string& strErr) {
         }
 
         if (CService(ip).GetPort() == 55786) {
-            LogPrintf("Invalid port detected in masternode.conf: %s (26969 must be only on mainnet)\n", line.c_str());
+            LogPrintf("Invalid port detected in masternode.conf: %s (55786 must be only on mainnet)\n", line.c_str());
             streamConfig.close();
             return false;
         }
