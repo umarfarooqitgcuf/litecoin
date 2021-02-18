@@ -4280,6 +4280,12 @@ UniValue masternode(const JSONRPCRequest& request) {
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     CWallet* const pwallet = wallet.get();
 
+    std::string strErr;
+        if (!masternodeConfig.read(strErr)) {
+            throw runtime_error(
+                    "Error in reading masternode conf file\n");
+        }
+
     string strCommand;
     if (!request.params[0].isNull())
         strCommand = request.params[0].get_str();
