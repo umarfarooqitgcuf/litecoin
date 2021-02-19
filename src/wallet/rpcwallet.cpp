@@ -253,6 +253,71 @@ static UniValue getnewaddress(const JSONRPCRequest& request)
     return EncodeDestination(dest);
 }
 
+static UniValue getaccountaddress(const JSONRPCRequest& request)
+{
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    CWallet* const pwallet = wallet.get();
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+                RPCHelpMan{"getaccountaddress",
+                           "\nReturns a new Nexalt address for masternode.\n"
+                           "If 'label' is specified, it is added to the address book \n"
+                           "so payments received with the address will be associated with 'label'.\n",
+                           {
+                                   {"label", RPCArg::Type::STR, /* default */ "\"\"", "The label name for the address to be linked to. It can also be set to the empty string \"\" to represent the default label. The label does not need to exist, it will be created if there is no label by the given name."},
+                           },
+                           RPCResult{
+                                   "\"address\"    (string) The new nexalt address\n"
+                           },
+                           RPCExamples{
+                                   HelpExampleCli("getaccountaddress", "")
+                                   + HelpExampleRpc("getaccountaddress", "")
+                           },
+                }.ToString());
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+
+    UniValue ret(UniValue::VSTR);
+
+
+    WalletDatabase& dbh = pwallet->GetDBHandle();
+    WalletBatch walletdb(dbh);
+    CAccount account;
+    walletdb.ReadAccount(request.params[0].get_str(), account);
+    bool bKeyUsed = false;
+    bool bForceNew = false;
+
+    if (account.vchPubKey.IsValid())
+    {
+        CScript scriptPubKey = GetScriptForDestination(account.vchPubKey.GetID());
+        for (std::map<uint256, CWalletTx>::iterator it = pwallet->mapWallet.begin();
+             it != pwallet->mapWallet.end() && account.vchPubKey.IsValid();
+             ++it)
+        {
+            const CWalletTx& wtx = (*it).second;
+            for (const CTxOut& txout : wtx.tx->vout)
+                if (txout.scriptPubKey == scriptPubKey)
+                    bKeyUsed = true;
+        }
+    }
+
+    // Generate a new key
+    if (!account.vchPubKey.IsValid() || bForceNew || bKeyUsed)
+    {
+        if (!pwallet->GetKeyFromPool(account.vchPubKey, false))
+        {
+            return nullptr;
+        }
+        pwallet->SetAddressBook(account.vchPubKey.GetID(), request.params[0].get_str(), "");
+        walletdb.WriteAccount(request.params[0].get_str(), account);
+
+        walletdb.WriteName(EncodeDestination(account.vchPubKey.GetID()), request.params[0].get_str());
+    }
+    //std::string colletraladdress = EncodeDestination(account.vchPubKey.GetID());
+    ret = EncodeDestination(account.vchPubKey.GetID());
+    return ret;
+}
+
 static UniValue getrawchangeaddress(const JSONRPCRequest& request)
 {
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
@@ -5332,6 +5397,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "getaddressinfo",                   &getaddressinfo,                {"address"} },
     { "wallet",             "getbalance",                       &getbalance,                    {"dummy","minconf","include_watchonly"} },
     { "wallet",             "getnewaddress",                    &getnewaddress,                 {"label","address_type"} },
+    { "wallet",             "getaccountaddress",                &getaccountaddress,              {"label","address_type"} },
     { "wallet",             "getrawchangeaddress",              &getrawchangeaddress,           {"address_type"} },
     { "wallet",             "getreceivedbyaddress",             &getreceivedbyaddress,          {"address","minconf"} },
     { "wallet",             "getreceivedbylabel",               &getreceivedbylabel,            {"label","minconf"} },
