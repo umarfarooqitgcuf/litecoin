@@ -1356,6 +1356,8 @@ bool Stake::CreateCoinStake(CWallet* wallet, const CKeyStore& keystore, unsigned
         mainminerReward = MainMinerReward(pIndex0->nHeight);
         if (timeNow > START_POS_BLOCK_V2){
             mainminerReward = /*nFees +*/ StakerRewardV2(pIndex0->nHeight);
+            if (timeNow > POS_REWARD_V3)
+                mainminerReward = /*nFees +*/ StakerRewardV3(pIndex0->nHeight);
         }
     }else{
         mainminerReward = (GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus())) - (mlcDistribution * COIN);
@@ -1367,6 +1369,8 @@ bool Stake::CreateCoinStake(CWallet* wallet, const CKeyStore& keystore, unsigned
         mainminerReward = mainminerReward - (uplineReward * 10);
     }
     CAmount mnReward = GetMasternodePosReward(pIndex0->nHeight, GetBlockSubsidy(pIndex0->nHeight, chainparams.GetConsensus()));
+    if (timeNow > POS_REWARD_V3)
+        mnReward = /*nFees +*/ MasterRewardV3(pIndex0->nHeight);
 
     nCredit += mainminerReward;
     CAmount nMinFee = 0;
@@ -1482,6 +1486,14 @@ bool Stake::CreateBlockStake(CWallet* wallet, CBlock* block) {
     int64_t nTime = GetAdjustedTime();
     CBlockIndex* tip = chainActive.Tip();
     block->nTime = nTime;
+    //difficulty adjustment block should be pow
+    if ((block->GetBlockTime() >= NEW_DIFFICULTY_RULE)) {
+        const CBlockIndex *pindexLast;
+        pindexLast = GetLastBlockIndex(tip, true);
+        if ((tip->nHeight + 1) % Params().GetConsensus().DifficultyAdjustmentInterval() == 0) {
+            return false;
+        }
+    }
     block->nBits = GetNextWorkRequired(tip, block, Params().GetConsensus(), true);
     if (nTime >= nLastStakeTime) {
         CMutableTransaction tx;
@@ -1572,6 +1584,11 @@ void Stake::StakingThread(CWallet* wallet, CConnman* connman) {
                 }
             }
 
+            CScript mnPayee;
+            if (!SelectMasternodePayee(mnPayee)){
+                nCanStake = false;
+            }
+
             const CBlockIndex* tip = nullptr;
             if (nCanStake) {
                 while (wallet->IsLocked() || nReserveBalance >= wallet->GetBalance()) {
@@ -1604,8 +1621,10 @@ void Stake::StakingThread(CWallet* wallet, CConnman* connman) {
 #endif
             boost::this_thread::interruption_point();
 
-            if (nCanStake && GenBlockStake(wallet, extra)) {
-                MilliSleep(1500);
+            if (nCanStake) {
+                if (GenBlockStake(wallet, extra)){
+                    MilliSleep(100000);
+                }
             } else {
                 MilliSleep(1000);
             }

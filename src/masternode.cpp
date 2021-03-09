@@ -61,21 +61,6 @@ void ProcessMasternodeConnections() {
 }
 
 void ProcessMasternode(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, bool& isMasternodeCommand) {
-    //static const int nLuxProtocolSwitchHeight = 580000;
-    //int nHeight = chainActive.Height() + 1;
-
-    // Do not accept the peers having older versions when the fork happens
-    /*if (nHeight >= nLuxProtocolSwitchHeight)
-    {
-        SCVersion = WORKING_VERSION;
-    }*/
-
-    // Reject the MN from older version
-    /*if (pfrom && pfrom->strSubVer.compare(SCVersion) < 0)
-    {
-        LogPrintf("MASTERNODE: %s: Invalid MN %d, wrong wallet version %s\n", __func__, nHeight, pfrom->strSubVer.c_str());
-        return;
-    }*/
     std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
 
     const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
@@ -188,7 +173,7 @@ void ProcessMasternode(CNode* pfrom, const std::string& strCommand, CDataStream&
 
         CValidationState state;
         CMutableTransaction tx = CMutableTransaction();
-        int mncollateral = chainActive.Height()>=30000 ? 300 : 200;
+        int mncollateral = GetMNCollateral(chainActive.Height());
         CTxOut vout = CTxOut((mncollateral - 1) * COIN, darkSendPool.collateralPubKey);
         tx.vin.push_back(vin);
         tx.vout.push_back(vout);
@@ -240,6 +225,167 @@ void ProcessMasternode(CNode* pfrom, const std::string& strCommand, CDataStream&
         }
     }
 
+    if (strCommand == "dsee_block") { //DarkSend Election Entry
+        isMasternodeCommand = true;
+
+        bool fIsInitialDownload = IsInitialBlockDownload();
+        if (fIsInitialDownload) return;
+
+        CTxIn vin;
+        CService addr;
+        CPubKey pubkey;
+        CPubKey pubkey2;
+        vector<unsigned char> vchSig;
+        int64_t sigTime;
+        int count;
+        int current;
+        int64_t lastUpdated;
+        int protocolVersion;
+        std::string strMessage;
+
+        // 70047 and greater
+        vRecv >> vin >> addr >> vchSig >> sigTime >> pubkey >> pubkey2 >> count >> current >> lastUpdated >> protocolVersion;
+
+        // make sure signature isn't in the future (past is OK)
+        if (sigTime > GetAdjustedTime() + 60 * 60) {
+            LogPrintf("dsee - Signature rejected, too far into the future %s\n", vin.ToString().c_str());
+            return;
+        }
+
+        bool isLocal = addr.IsRFC1918() || addr.IsLocal();
+        //if(Params().MineBlocksOnDemand()) isLocal = false;
+
+        std::string vchPubKey(pubkey.begin(), pubkey.end());
+        std::string vchPubKey2(pubkey2.begin(), pubkey2.end());
+
+        strMessage = addr.ToString() + boost::lexical_cast<std::string>(sigTime) + vchPubKey + vchPubKey2 + boost::lexical_cast<std::string>(protocolVersion);
+
+        if (protocolVersion < MIN_PROTO_VERSION) {
+            LogPrintf("dsee - ignoring outdated masternode %s protocol version %d\n", vin.ToString().c_str(), protocolVersion);
+            return;
+        }
+
+        CScript pubkeyScript;
+        pubkeyScript = GetScriptForDestination(pubkey.GetID());
+
+        if (pubkeyScript.size() != 25) {
+            LogPrintf("dsee - pubkey the wrong size\n");
+            //Misbehaving(pfrom->GetId(), 100);
+            return;
+        }
+
+        CScript pubkeyScript2;
+        pubkeyScript2 = GetScriptForDestination(pubkey2.GetID());
+
+        if (pubkeyScript2.size() != 25) {
+            LogPrintf("dsee - pubkey2 the wrong size\n");
+            //Misbehaving(pfrom->GetId(), 100);
+            return;
+        }
+
+        std::string errorMessage = "";
+        if (!darkSendSigner.VerifyMessage(pubkey, vchSig, strMessage, errorMessage)) {
+            LogPrintf("dsee - Got bad masternode address signature\n");
+            //Misbehaving(pfrom->GetId(), 100);
+            return;
+        }
+
+
+        //search existing masternode list, this is where we update existing masternodes with new dsee broadcasts
+        LOCK(cs_masternodes);
+        for (CMasterNode& mn : vecMasternodes) {
+            if (mn.vin.prevout == vin.prevout) {
+                // count == -1 when it's a new entry
+                //   e.g. We don't want the entry relayed/time updated when we're syncing the list
+                // mn.pubkey = pubkey, IsVinAssociatedWithPubkey is validated once below,
+                //   after that they just need to match
+                if (count == -1 && mn.pubkey == pubkey && !mn.UpdatedWithin(MASTERNODE_MIN_DSEE_SECONDS)) {
+                    mn.UpdateLastSeen();
+
+                    if (mn.now < sigTime) { //take the newest entry
+                        LogPrintf("dsee - Got updated entry for %s\n", addr.ToString().c_str());
+                        mn.pubkey2 = pubkey2;
+                        mn.now = sigTime;
+                        mn.sig = vchSig;
+                        mn.protocolVersion = protocolVersion;
+                        mn.addr = addr;
+
+                        //g_connmanM->PushMessage(pfrom, msgMaker.Make("dsee", vin, addr, vchSig, sigTime, pubkey, pubkey2, count, current, lastUpdated, protocolVersion));
+                    }
+                }
+
+                return;
+            }
+        }
+
+        // make sure the vout that was signed is related to the transaction that spawned the masternode
+        //  - this is expensive, so it's only done once per masternode
+        if (!darkSendSigner.IsVinAssociatedWithPubkey(vin, pubkey) && !IsInitialBlockDownload()) {
+            LogPrintf("dsee - Got mismatched pubkey and vin\n");
+            //Misbehaving(pfrom->GetId(), 10);
+            return;
+        }
+
+        if (fDebug) LogPrintf("dsee - Got NEW masternode entry %s\n", addr.ToString().c_str());
+
+        // make sure it's still unspent
+        //  - this is checked later by .check() in many places and by ThreadCheckDarkSendPool()
+
+        CValidationState state;
+        CMutableTransaction tx = CMutableTransaction();
+        //int mncollateral = chainActive.Height()>=30000 ? 10000 : 10000;
+        int mncollateral = GetMNCollateral(chainActive.Height());;
+        CTxOut vout = CTxOut((mncollateral - 1) * COIN, darkSendPool.collateralPubKey);
+        tx.vin.push_back(vin);
+        tx.vout.push_back(vout);
+
+        bool inputsAcceptable;
+        {
+            LOCK(cs_main);
+            bool pfMissingInputs;
+            inputsAcceptable = AcceptableInputs(mempool, state, CTransaction(tx), false, &pfMissingInputs);
+        }
+        if (inputsAcceptable) {
+            //if (fDebug) LogPrintf("dsee - Accepted masternode entry %i %i\n", count, current);
+
+            if (GetInputAge(vin) < MASTERNODE_MIN_CONFIRMATIONS) {
+                LogPrintf("dsee - Input must have least %d confirmations\n", MASTERNODE_MIN_CONFIRMATIONS);
+                //Misbehaving(pfrom->GetId(), 20);
+                return;
+            }
+
+            // use this as a peer
+            std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+
+            g_connmanM->addrman.Add(CAddress(addr, NODE_NETWORK), pfrom->addr, 2 * 60 * 60);
+
+            // add our masternode
+            CMasterNode mn(addr, vin, pubkey, vchSig, sigTime, pubkey2, protocolVersion);
+            mn.UpdateLastSeen(lastUpdated);
+            vecMasternodes.push_back(mn);
+
+            // if it matches our masternodeprivkey, then we've been remotely activated
+            if (pubkey2 == activeMasternode.pubKeyMasternode && protocolVersion == PROTOCOL_VERSION) {
+                activeMasternode.EnableHotColdMasterNode(vin, addr);
+            }
+
+            if (count == -1 && !isLocal){
+                //g_connmanM->PushMessage(pfrom, msgMaker.Make("dsee", vin, addr, vchSig, sigTime, pubkey, pubkey2, count, current, lastUpdated, protocolVersion));
+            }
+
+        } else {
+            LogPrintf("dsee - Rejected masternode entry %s\n", addr.ToString().c_str());
+
+            int nDoS = 0;
+            if (state.IsInvalid(nDoS)) {
+                //LogPrintf("dsee - %s from %s %s was not accepted into the memory pool\n", tx.GetHash().ToString().c_str(),
+                          pfrom->addr.ToString().c_str(), pfrom->cleanSubVer.c_str());
+                //if (nDoS > 0)
+                //Misbehaving(pfrom->GetId(), nDoS);
+            }
+        }
+    }
+
     else if (strCommand == "dseep") { //DarkSend Election Entry Ping
         isMasternodeCommand = true;
         bool fIsInitialDownload = IsInitialBlockDownload();
@@ -272,7 +418,7 @@ void ProcessMasternode(CNode* pfrom, const std::string& strCommand, CDataStream&
                     std::string strMessage = mn.addr.ToString() + boost::lexical_cast<std::string>(sigTime) + boost::lexical_cast<std::string>(stop);
 
                     std::string errorMessage = "";
-                    if (!darkSendSigner.VerifyMessage(mn.pubkey2, vchSig, strMessage, errorMessage)) {
+                    if (!darkSendSigner.VerifyMessage(mn.pubkey, vchSig, strMessage, errorMessage)) {
                         LogPrintf("dseep - Got bad masternode address signature %s \n", vin.ToString().c_str());
                         //Misbehaving(pfrom->GetId(), 100);
                         return;
@@ -280,14 +426,14 @@ void ProcessMasternode(CNode* pfrom, const std::string& strCommand, CDataStream&
 
                     mn.lastDseep = sigTime;
 
-                    if (!mn.UpdatedWithin(MASTERNODE_MIN_DSEEP_SECONDS)) {
-                        mn.UpdateLastSeen();
-                        if (stop) {
-                            mn.Disable();
-                            mn.Check();
-                        }
-                        g_connmanM->PushMessage(pfrom, msgMaker.Make("dseep", vin, vchSig, sigTime, stop));
+                    //if (!mn.UpdatedWithin(MASTERNODE_MIN_DSEEP_SECONDS)) {
+                    mn.UpdateLastSeen();
+                    if (stop) {
+                        mn.Disable();
+                        mn.Check();
                     }
+                    g_connmanM->PushMessage(pfrom, msgMaker.Make("dseep", vin, vchSig, sigTime, stop));
+                    //}
                 }
                 return;
             }
@@ -361,7 +507,57 @@ void ProcessMasternode(CNode* pfrom, const std::string& strCommand, CDataStream&
             }
             i++;
         }
-        LogPrintf("dseg - Sent Second %d masternode entries to %s\n", count, pfrom->addr.ToString().c_str());
+    }
+
+    else if (strCommand == "dseg_block") { //Get masternode list or specific entry
+        isMasternodeCommand = true;
+
+        CTxIn vin;
+        vRecv >> vin;
+
+        if (vin == CTxIn()) { //only should ask for this once
+            //local network
+            //Note tor peers show up as local proxied addrs //
+
+            std::map<CNetAddr, int64_t>::iterator i = askedForMasternodeList.find(pfrom->addr);
+            if (i != askedForMasternodeList.end()) {
+                int64_t t = (*i).second;
+                if (GetTime() < t) {
+                    //Misbehaving(pfrom->GetId(), 34);
+                    //LogPrintf("dseg - peer already asked me for the list\n");
+                    //return;
+                }
+            }
+
+            int64_t askAgain = GetTime() + (60 * 60 * 3);
+            askedForMasternodeList[pfrom->addr] = askAgain;
+        }//else, asking for a specific node which is ok
+
+        LOCK(cs_masternodes);
+        int count = vecMasternodes.size();
+        int i = 0;
+
+        for (CMasterNode mn : vecMasternodes) {
+            //if (mn.addr.IsRFC1918()) continue; //local network
+
+            if (vin == CTxIn()) {
+                mn.Check();
+                if (mn.IsEnabled()) {
+                    if (fDebug) LogPrintf("dseg - Sending masternode entry - %s \n", mn.addr.ToString().c_str());
+
+                    g_connmanM->PushMessage(pfrom, msgMaker.Make("dsee_block", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2,
+                                                                 count, i, mn.lastTimeSeen, mn.protocolVersion));
+                }
+            }
+            else if (vin == mn.vin) {
+                //LogPrintf("dseg - Sending masternode entry - %s \n", mn.addr.ToString().c_str());
+                g_connmanM->PushMessage(pfrom, msgMaker.Make("dsee_block", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2,
+                                                             count, i, mn.lastTimeSeen, mn.protocolVersion));
+                //LogPrintf("dseg - Sent 1 masternode entries to %s\n", pfrom->addr.ToString().c_str());
+                return;
+            }
+            i++;
+        }
     }
 
     else if (strCommand == "mnget") { //Masternode Payments Request Sync

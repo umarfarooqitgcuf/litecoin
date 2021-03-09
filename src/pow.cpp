@@ -34,7 +34,7 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params, bool fProofOfStake)
 {
-
+    const CBlockIndex* difficultyAdjustment = pindexLast;
     if ((pblock->GetBlockTime() >= START_POS_BLOCK) /*&& fProofOfStake*/) {
         if (!fProofOfStake) {
             pindexLast = GetLastBlockIndex(pindexLast, fProofOfStake);
@@ -42,6 +42,27 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 
             unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
             // Only change once per difficulty adjustment interval
+            if ((pblock->GetBlockTime() >= NEW_DIFFICULTY_RULE)) {
+
+                if ((difficultyAdjustment->nHeight + 1) % params.DifficultyAdjustmentInterval() != 0) {
+                    if (params.fPowAllowMinDifficultyBlocks) {
+                        // Special difficulty rule for testnet:
+                        // If the new block's timestamp is more than 2* 10 minutes
+                        // then allow mining of a min-difficulty block.
+                        if (pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing * 2)
+                            return nProofOfWorkLimit;
+                        else {
+                            // Return the last non-special-min-difficulty-rules-block
+                            const CBlockIndex *pindex = pindexLast;
+                            while (pindex->pprev && pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 &&
+                                   pindex->nBits == nProofOfWorkLimit)
+                                pindex = pindex->pprev;
+                            return pindex->nBits;
+                        }
+                    }
+                    return pindexLast->nBits;
+                }
+            }else{
             if ((pindexLast->nHeight + 1) % params.DifficultyAdjustmentInterval() != 0) {
                 if (params.fPowAllowMinDifficultyBlocks) {
                     // Special difficulty rule for testnet:
@@ -61,6 +82,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
                 }
                 return pindexLast->nBits;
             }
+        }
 
             // Go back by what we want to be 14 days worth of blocks
             // Nexalt: This fixes an issue where a 51% attack can change difficulty at will.

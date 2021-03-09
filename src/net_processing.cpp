@@ -1022,6 +1022,9 @@ void PeerLogicValidation::UpdatedBlockTip(const CBlockIndex *pindexNew, const CB
             if (nNewHeight > (pnode->nStartingHeight != -1 ? pnode->nStartingHeight - 2000 : 0)) {
                 for (const uint256& hash : reverse_iterate(vHashes)) {
                     pnode->PushBlockHash(hash);
+                    std::unique_ptr<CConnman>  g_connmanM = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
+                    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
+                    g_connmanM->PushMessage(pnode, msgMaker.Make("dseg_block",CTxIn()));
                 }
             }
         });
@@ -1945,7 +1948,8 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && nVersion == 70015){
+        if(nHeight > 110556 && nVersion <= 70016 && nTime >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
         }
@@ -1967,9 +1971,11 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             vRecv >> LIMITED_STRING(strSubVer, MAX_SUBVERSION_LENGTH);
             cleanSubVer = SanitizeString(strSubVer);
         }
-        if(cleanSubVer == "/NexaltCore:0.19.0/"){
-            Misbehaving(pfrom->GetId(), 100);
-            pfrom->fDisconnect = true;
+        if (nTime >= POS_REWARD_V3) {
+            if (cleanSubVer == "/NexaltCore:0.19.0/" || cleanSubVer == "/NexaltCore:0.20.2/") {
+                Misbehaving(pfrom->GetId(), 100);
+                pfrom->fDisconnect = true;
+            }
         }
         if (!vRecv.empty()) {
             vRecv >> nStartingHeight;
@@ -1987,6 +1993,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         if (pfrom->fInbound && addrMe.IsRoutable())
         {
             SeenLocal(addrMe);
+        }
+
+        if (!IsInitialBlockDownload()){
+            connman->PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make("dseg_block",CTxIn()));
         }
 
         // Be shy and don't send version until we hear
@@ -2114,7 +2124,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && pfrom->nVersion == 70015){
+        int64_t nNow = GetAdjustedTime();
+        if(nHeight > 110556 && pfrom->nVersion <= 70016 &&  nNow >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
         }
@@ -2325,7 +2337,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && pfrom->nVersion == 70015){
+        int64_t nNow = GetAdjustedTime();
+        if(nHeight > 110556 && pfrom->nVersion <= 70016 && nNow >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
         }
@@ -2397,7 +2411,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && pfrom->nVersion == 70015){
+        int64_t nNow = GetAdjustedTime();
+        if(nHeight > 110556 && pfrom->nVersion <= 70016 && nNow >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
         }
@@ -2458,7 +2474,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && pfrom->nVersion == 70015){
+        int64_t nNow = GetAdjustedTime();
+        if(nHeight > 110556 && pfrom->nVersion <= 70016 && nNow >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
         }
@@ -2540,7 +2558,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && pfrom->nVersion == 70015){
+        int64_t nNow = GetAdjustedTime();
+        if(nHeight > 110556 && pfrom->nVersion <= 70016 && nNow >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
         }
@@ -2696,9 +2716,14 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && pfrom->nVersion == 70015){
+        int64_t nNow = GetAdjustedTime();
+        if(nHeight > 110556 && pfrom->nVersion <= 70016 && nNow >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
+        }
+        if (!IsInitialBlockDownload()){
+            connman->PushMessage(pfrom, msgMaker.Make("dseg_block",CTxIn()));
         }
 
         bool received_new_header = false;
@@ -2928,7 +2953,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && pfrom->nVersion == 70015){
+        int64_t nNow = GetAdjustedTime();
+        if(nHeight > 110556 && pfrom->nVersion <= 70016 && nNow >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
         }
@@ -3013,7 +3040,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && pfrom->nVersion == 70015){
+        int64_t nNow = GetAdjustedTime();
+        if(nHeight > 110556 && pfrom->nVersion <= 70016 && nNow >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
         }
@@ -3050,7 +3079,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && pfrom->nVersion == 70015){
+        int64_t nNow = GetAdjustedTime();
+        if(nHeight > 110556 && pfrom->nVersion <= 70016 && nNow >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
         }
@@ -3164,7 +3195,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             assert(pindexPrev != nullptr);
             nHeight = pindexPrev->nHeight;
         }
-        if(nHeight > 110556 && pfrom->nVersion == 70015){
+        int64_t nNow = GetAdjustedTime();
+        if(nHeight > 110556 && pfrom->nVersion <=  70016 && nNow >= POS_REWARD_V3){
+            Misbehaving(pfrom->GetId(), 100);
             pfrom->fDisconnect = true;
             return false;
         }

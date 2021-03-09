@@ -338,7 +338,12 @@ bool CheckTransactionToGetData(const CTransaction &tx, CValidationState &state, 
         uplineReward = (subsidy * 10) /100 ;
     }
 
-    double masternodereward = GetMasternodePosReward(nHeight,1);
+    double masternodereward;
+    if (block.nTime > POS_REWARD_V3 ){
+        masternodereward = MasterRewardV3(nHeight);
+    }else{
+        masternodereward = GetMasternodePosReward(nHeight,1);
+    }
 
     // Basic checks that don't depend on any context
     if (tx.vin.empty())

@@ -1842,6 +1842,38 @@ CAmount StakerRewardV2(int nHeight)
     return minerReward;
 }
 
+CAmount StakerRewardV3(int nHeight)
+{
+    const CChainParams& chainParams = Params();
+
+    int halvings = nHeight / chainParams.GetConsensus().nSubsidyHalvingInterval;
+    // Force block reward to zero when right shift is undefined.
+    if (halvings >= 64)
+        return 0;
+
+    CAmount minerReward =  20 * COIN;
+    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
+    minerReward >>= halvings;
+
+    return minerReward;
+}
+
+CAmount MasterRewardV3(int nHeight)
+{
+    const CChainParams& chainParams = Params();
+
+    int halvings = nHeight / chainParams.GetConsensus().nSubsidyHalvingInterval;
+    // Force block reward to zero when right shift is undefined.
+    if (halvings >= 64)
+        return 0;
+
+    CAmount minerReward =  19.50 * COIN;
+    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
+    minerReward >>= halvings;
+
+    return minerReward;
+}
+
 CAmount MasterRewardV2(int nHeight)
 {
     const CChainParams& chainParams = Params();
@@ -4141,6 +4173,9 @@ bool CheckForMasternodePayment(const CTransaction& tx, const CBlockHeader& heade
     }
     // Divide to keep a check precision of 0.01 XLT
     CAmount mnReward = GetMasternodePosReward(nHeight, totalReward);
+    if (header.nTime > NEW_DIFFICULTY_RULE){
+        mnReward = MasterRewardV3(nHeight);
+    }
 
     // Old blocks sync from other nodes: check the amounts, not via the "current" pub keys
     if (!hasMasternodePayment && tx.vout.size() >= 2) {
@@ -4690,6 +4725,16 @@ bool CheckWork(const CBlock &block, CBlockIndex* pindexPrev)
     if (pindexPrev == NULL) {
         pindexPrev = chainActive.Tip();
         //return error("%s: null pindexPrev for block %s", __func__, block.GetHash().GetHex());
+    }
+
+    if ((block.GetBlockTime() >= NEW_DIFFICULTY_RULE)) {
+        const CBlockIndex *pindexLast;
+        pindexLast = GetLastBlockIndex(pindexPrev, block.IsProofOfStake());
+        if ((pindexPrev->nHeight + 1) % consensusParams.DifficultyAdjustmentInterval() == 0) {
+            if (block.IsProofOfStake()) {
+                return false;
+            }
+        }
     }
 
     unsigned int nBitsRequired = GetNextWorkRequired(pindexPrev, &block, consensusParams, block.IsProofOfStake());

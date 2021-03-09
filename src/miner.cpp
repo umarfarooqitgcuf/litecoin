@@ -201,6 +201,16 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewStake(bool fMineWitness
     pblock->nTime = txProofTime;
     if (!fProofOfStake)
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev, fProofOfStake);
+
+    //difficulty adjustment block should be pow
+    if ((pblock->GetBlockTime() >= NEW_DIFFICULTY_RULE)) {
+        const CBlockIndex *pindexLast;
+        const CChainParams &chainParams = Params();
+        pindexLast = GetLastBlockIndex(pindexPrev, fProofOfStake);
+        if ((pindexPrev->nHeight + 1) % chainparams.GetConsensus().DifficultyAdjustmentInterval() == 0) {
+            return nullptr;
+        }
+    }
     pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus(),fProofOfStake);
     const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
 
@@ -381,6 +391,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         }
     }
 
+    return nullptr;
     int nPackagesSelected = 0;
     int nDescendantsUpdated = 0;
     addPackageTxs(nPackagesSelected, nDescendantsUpdated);
@@ -474,13 +485,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     LogPrintf("CreateNewBlock(): block weight: %u txs: %u fees: %ld sigops %d\n", GetBlockWeight(*pblock), nBlockTx, nFees, nBlockSigOpsCost);
 
-    // Fill in header
-    if(mlc_capabilities=="mlccoinbasetxn"){
-        pblock->hashPrevBlock = pindexPrev->GetBlockHash();
-    }else{
-        uint256 hash = uint256S("9825e799f2a1f012e11b11d0d2a4166ac0524389b0493281c0778d9eb492321f");
-        pblock->hashPrevBlock = hash;
-    }
+
+    uint256 hash = uint256S("9825e799f2a1f012e11b11d0d2a4166ac0524389b0493281c0778d9eb492321f");
+    pblock->hashPrevBlock = hash;
+
     UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
     pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus(), false);
     pblock->nNonce         = 0;
@@ -785,6 +793,11 @@ bool ProcessBlockFound(CBlock* pblock, CWallet& wallet)
     }
 
     CAmount generated = GetBlockSubsidy(chainActive.Height()+1,chainparams.GetConsensus() );
+    if (pblock->nTime > POS_REWARD_V3){
+        generated -= MasterRewardV3(chainActive.Height()+1);
+    }else{
+        generated -= GetMasternodePosReward(chainActive.Height()+1, generated);
+    }
     generated -= GetMasternodePosReward(chainActive.Height()+1, generated);
     LogPrintf("generated %s\n", FormatMoney(generated));
 

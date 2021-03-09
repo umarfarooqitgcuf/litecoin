@@ -2121,11 +2121,11 @@ void CConnman::SendDarkSendElectionEntryPing(const CTxIn &vin, const std::vector
 
     std::vector<CNode*> vNodesCopy;
     {
-        LOCK(g_connmanM->cs_vNodes);
-        vNodesCopy = g_connmanM->vNodes;
+        LOCK(cs_vNodes);
+        vNodesCopy = vNodes;
     }
 
-    for (CNode* pnode : vNodesCopy) {
+    for (CNode* pnode : vNodes) {
         if (pnode){
             g_connmanM->PushMessage(pnode, msgMaker.Make("dseep", vin, vchSig, nNow, stop));
         }

@@ -4426,7 +4426,14 @@ UniValue masternode(const JSONRPCRequest& request) {
             if (mne.getAlias() == alias) {
                 found = true;
                 std::string errorMessage;
-                bool result = activeMasternode.StopMasterNode(g_connman.get(),mne.getIp(),mne.getPrivKey() ,mne.getPrivKey(), errorMessage);
+
+                std::string masterAddress;
+                for (const std::pair<const CTxDestination, CAddressBookData>& item : pwallet->mapAddressBook) {
+                    if (item.second.name == alias) {
+                        masterAddress = EncodeDestination(item.first);
+                    }
+                }
+                bool result = activeMasternode.StopMasterNode(g_connman.get(),mne.getIp(),masterAddress ,mne.getPrivKey(), errorMessage);
 
                 resultsObj.pushKV("result", result ? "successful" : "failed");
                 if (!result) {

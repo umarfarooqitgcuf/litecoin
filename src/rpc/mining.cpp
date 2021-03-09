@@ -400,10 +400,10 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
     if (request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) == WALLET_ENDPOINT_BASE) {
         wallet_name = urlDecode(request.URI.substr(WALLET_ENDPOINT_BASE.size()));
     }
-    bool dbCheck=IsSponsorKeySaved(wallet_name);
+    /*bool dbCheck=IsSponsorKeySaved(wallet_name);
     if(!dbCheck){
         throw JSONRPCError(RPC_WALLET_ERROR, "Your sponsor key is not added. Kindly add it using console command <addmlckeyraw sponsor_key>.");
-    }
+    }*/
     std::string capabilities="mlccoinbasetxn";
     
     LOCK(cs_main);
@@ -749,11 +749,9 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
     }
     result.pushKV("curtime", pblock->GetBlockTime());
     result.pushKV("bits", strprintf("%08x", pblock->nBits));
-    if(capabilities != ""){
-        result.pushKV("height", (int64_t)(pindexPrev->nHeight+1));
-    }else{
-        result.pushKV("height", (int64_t)(pindexPrev->nHeight));
-    }
+
+    result.pushKV("height", (int64_t)(pindexPrev->nHeight));
+
 
     if (!pblocktemplate->vchCoinbaseCommitment.empty()) {
         result.pushKV("default_witness_commitment", HexStr(pblocktemplate->vchCoinbaseCommitment.begin(), pblocktemplate->vchCoinbaseCommitment.end()));

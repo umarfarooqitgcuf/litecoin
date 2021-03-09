@@ -144,6 +144,8 @@ static const int64_t MAX_FEE_ESTIMATION_TIP_AGE = 3 * 60 * 60;
 
 #define START_MASTERNODE_PAYMENTS 1610172000
 #define START_POS_BLOCK 1610172000
+#define NEW_DIFFICULTY_RULE 1615305600
+#define POS_REWARD_V3 1615305600
 #define START_POS_BLOCK_V2 1610549709
 #define START_MASTERNODE_PAYMENTS_V2 1610549709
 static const int64_t DARKSEND_COLLATERAL = (10000*COIN); //10000 XLT
@@ -355,6 +357,10 @@ CAmount MinerRewardV2(int nHeight);
 CAmount StakerRewardV2(int nHeight);
 
 CAmount MasterRewardV2(int nHeight);
+
+CAmount StakerRewardV3(int nHeight);
+
+CAmount MasterRewardV3(int nHeight);
 
 bool IsMagicBlock(int nHeight);
 
